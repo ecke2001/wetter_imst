@@ -9,15 +9,21 @@ pinned: false
 
 # AgrarWetter Imst
 
-Eine mobile-optimierte Wetter-App für Landwirte im Raum Imst (Tirol), Österreich. Die App lädt Echtzeit-Wetterprognosen von Open-Meteo und berechnet landwirtschaftliche Kriterien wie Heuwetter, Spritzwetter und Gülle-Wetter.
+Eine hochperformante, mobile-optimierte Wetter-App für Landwirte im Raum Imst (Tirol), Österreich. Die App lädt Echtzeit-Wetterprognosen von Open-Meteo und berechnet spezifische landwirtschaftliche Kriterien.
 
 ## Features
-- **Heuwetter-Index:** Zeigt die Eignung der nächsten 3 Tage zum Heuen (0-100%).
-- **Spritzwetter-Index:** Zeigt stündliche Sprüh-Eignung für Pflanzenschutz.
-- **Gülle-Wetter-Index:** Optimaler Düngezeitpunkt (Einsickern der Nährstoffe).
-- **Regenradar:** Integriertes interaktives Windy-Radar zentriert auf Imst.
-- **Diagramme:** Stündliche Trends (Temperatur/Taupunkt, Windböen, Regen).
-- **Agrar-Links:** Direkte Links zu offiziellen Quellen wie LK Tirol, GeoSphere Austria, Kachelmannwetter, Hydro Online.
+- **Agrar-Indizes:** Tägliche und stündliche Indizes für Heuwetter, Spritzwetter und Gülle-Wetter.
+- **Heutrocknungs-Uhr:** Berechnet die Einfahrbereitschaft für Heu basierend auf der stündlichen Evapotranspiration (ET₀) und Regenunterbrechungen.
+- **Bodendaten:** Sensor-Messwerte für Bodentemperatur (Aussaat/Keimung) und Bodenfeuchte (Dürrewarnungen).
+- **Pflanzengesundheit:** Spezifische Indikatoren für Bienenflug, Apfelschorf-Risiko und Kraut-/Knollenfäule-Risiko.
+- **Regenradar:** Integriertes interaktives Windy-Radar zentriert auf Imst (Ressourcenschonend per Lazy-Load).
+- **Diagramme:** Stündliche Trends (Temperatur/Taupunkt, Windböen, Regen) visualisiert mit Chart.js.
+- **Standort-Fallback:** Nutzt standardmäßig Imst, unterstützt aber auch dynamisches GPS oder die Auswahl von 8 Gemeinden im Bezirk.
+
+## Architektur & Performance
+Diese App ist als statische Web-App (Vanilla JS/HTML/CSS) ohne Frameworks oder Build-Schritte umgesetzt.
+- **Keine Service Worker:** Voller Verzicht auf PWA-Caching zur Vermeidung von Lade-Konflikten.
+- **Performance:** Aggressives Resource-Hinting (`preconnect`, `dns-prefetch`), CDN-Pinning für Bibliotheken, optimierte DOM-Updates und O(1)-Vorhersagealgorithmen.
 
 ## Lokale Ausführung
 Starte einen Webserver im Stammverzeichnis:
