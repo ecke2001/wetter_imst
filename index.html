@@ -4,14 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgrarWetter Imst | Wetter & Heuwetter-Index für Tirol</title>
+    <meta name="description" content="Echtzeit-Wetterdaten, Heuwetter-Index, Bodentemperatur und Pflanzenschutz-Prognosen für Landwirte im Bezirk Imst, Tirol. Powered by Open-Meteo.">
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://api.open-meteo.com">
+    <link rel="dns-prefetch" href="https://api.open-meteo.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
     <!-- CSS Stylesheet -->
     <link rel="stylesheet" href="index.css">
 </head>
@@ -235,7 +238,7 @@
                     
                     <!-- Windy Iframe Container -->
                     <div class="radar-iframe-wrapper">
-                        <iframe id="windyRadarIframe" src="" frameborder="0" allowfullscreen></iframe>
+                        <iframe id="windyRadarIframe" src="" frameborder="0" allowfullscreen loading="lazy"></iframe>
                     </div>
 
                     <!-- Quick links radar -->

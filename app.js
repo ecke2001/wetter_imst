@@ -184,6 +184,9 @@ async function fetchWeatherData() {
         
         renderCharts(weatherData.hourly);
         
+        // Re-initialize all Lucide icons once after all DOM updates
+        lucide.createIcons();
+        
         // Update Timestamp
         const now = new Date();
         document.getElementById('updateTime').textContent = `Stand: Heute, ${now.toLocaleTimeString('de-AT', {hour: '2-digit', minute:'2-digit'})} Uhr`;
@@ -292,7 +295,7 @@ function updateCurrentWeather(current) {
         alertPill.classList.add('hide');
     }
     
-    lucide.createIcons();
+
 }
 
 /**
@@ -690,8 +693,7 @@ function updateForecastUI(daily, hourly) {
         listContainer.appendChild(row);
     }
     
-    // Re-initialize newly added icons
-    lucide.createIcons();
+
 }
 
 /**
@@ -700,12 +702,16 @@ function updateForecastUI(daily, hourly) {
 function generateHourlyRowsForDay(dayIndex, dateStr, hourly) {
     let rowsHtml = '';
     
-    // We search for matching hours. Open-Meteo provides a flat array of 168 hours (7 days * 24h).
-    for (let h = 0; h < hourly.time.length; h++) {
-        const hourTimeStr = hourly.time[h];
-        if (hourTimeStr.startsWith(dateStr)) {
-            // Found matching hour
-            const timeObj = new Date(hourTimeStr);
+    // Each day has 24 hours in the hourly array, starting at dayIndex * 24
+    const startIdx = dayIndex * 24;
+    const endIdx = Math.min(startIdx + 24, hourly.time.length);
+    
+    for (let h = startIdx; h < endIdx; h++) {
+        const timeObj = new Date(hourly.time[h]);
+        const hourInt = timeObj.getHours();
+        
+        // Only show key farming hours: 06:00, 09:00, 12:00, 15:00, 18:00, 21:00
+        if (hourInt === 6 || hourInt === 9 || hourInt === 12 || hourInt === 15 || hourInt === 18 || hourInt === 21) {
             const hourFormatted = timeObj.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
             
             const temp = hourly.temperature_2m[h].toFixed(1);
@@ -716,21 +722,17 @@ function generateHourlyRowsForDay(dayIndex, dateStr, hourly) {
             const gust = Math.round(hourly.wind_gusts_10m[h]);
             const et = hourly.et0_fao_evapotranspiration[h] ? hourly.et0_fao_evapotranspiration[h].toFixed(2) : '0.00';
             
-            // Only show key farming hours: 06:00, 09:00, 12:00, 15:00, 18:00, 21:00 to keep layout readable
-            const hourInt = timeObj.getHours();
-            if ([6, 9, 12, 15, 18, 21].includes(hourInt)) {
-                rowsHtml += `
-                    <tr>
-                        <td class="hourly-time">${hourFormatted} Uhr</td>
-                        <td class="hourly-temp">${temp}°C</td>
-                        <td class="hourly-rain">${rain} mm</td>
-                        <td>${prob}%</td>
-                        <td class="hourly-humidity">${rh}%</td>
-                        <td class="hourly-wind">${wind} (${gust}) km/h</td>
-                        <td class="hourly-et">${et} mm</td>
-                    </tr>
-                `;
-            }
+            rowsHtml += `
+                <tr>
+                    <td class="hourly-time">${hourFormatted} Uhr</td>
+                    <td class="hourly-temp">${temp}°C</td>
+                    <td class="hourly-rain">${rain} mm</td>
+                    <td>${prob}%</td>
+                    <td class="hourly-humidity">${rh}%</td>
+                    <td class="hourly-wind">${wind} (${gust}) km/h</td>
+                    <td class="hourly-et">${et} mm</td>
+                </tr>
+            `;
         }
     }
     return rowsHtml;
@@ -1039,23 +1041,10 @@ function simulateHayDrying(dayIndex, daily, hourly) {
     const rainProb = daily.precipitation_probability_max[dayIndex];
     const rainSum = daily.precipitation_sum[dayIndex];
     
-    // Find index of 08:00 AM of the mowing day in the hourly array
-    const dateStr = daily.time[dayIndex];
-    let startH = -1;
-    for (let h = 0; h < hourly.time.length; h++) {
-        if (hourly.time[h].startsWith(dateStr) && hourly.time[h].includes("T08:00")) {
-            startH = h;
-            break;
-        }
-    }
-    
-    if (startH === -1) {
-        for (let h = 0; h < hourly.time.length; h++) {
-            if (hourly.time[h].startsWith(dateStr)) {
-                startH = h;
-                break;
-            }
-        }
+    // Direct index: each day starts at dayIndex * 24, mowing starts at 08:00
+    let startH = dayIndex * 24 + 8;
+    if (startH >= hourly.time.length) {
+        startH = dayIndex * 24; // fallback to start of day
     }
     
     // If starting rain risk is too high
