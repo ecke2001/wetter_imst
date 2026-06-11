@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgrarWetter Imst | Wetter & Heuwetter-Index für Tirol</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-main">
+                <div class="logo-area">
+                    <i data-lucide="tractor" class="logo-icon"></i>
+                    <div>
+                        <h1>AgrarWetter Imst</h1>
+                        <p class="subtitle">Wetterdaten & Heuwetter-Index für die Tiroler Landwirtschaft</p>
+                    </div>
+                </div>
+                <div class="location-badge" id="locationBadge">
+                    <i data-lucide="map-pin"></i>
+                    <span>Imst, Tirol (828m)</span>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <nav class="tab-navigation">
+                <button class="tab-btn active" id="tabBtnDashboard" onclick="switchTab('dashboard')">
+                    <i data-lucide="layout-dashboard"></i> Übersicht & Indizes
+                </button>
+                <button class="tab-btn" id="tabBtnRadar" onclick="switchTab('radar')">
+                    <i data-lucide="radar"></i> Regenradar
+                </button>
+                <button class="tab-btn" id="tabBtnLinks" onclick="switchTab('links')">
+                    <i data-lucide="external-link"></i> Agrar-Infoportale
+                </button>
+            </nav>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="app-content">
+            
+            <!-- TAB 1: DASHBOARD -->
+            <section id="tabContentDashboard" class="tab-content active-content">
+                
+                <!-- Wetter-Warnung & Live-Status -->
+                <div class="status-bar" id="statusBar">
+                    <span class="update-time" id="updateTime">Daten werden geladen...</span>
+                    <div id="activeAlert" class="alert-pill hide">
+                        <i data-lucide="alert-triangle"></i>
+                        <span id="alertText">Keine Wetterwarnungen</span>
+                    </div>
+                </div>
+
+                <!-- AKTUELL & INDIZES GRID -->
+                <div class="dashboard-grid">
+                    <!-- Aktuelle Wetterbedingungen -->
+                    <div class="card current-weather-card">
+                        <h2>Aktuelles Wetter</h2>
+                        <div class="current-weather-main">
+                            <div class="weather-temp-info">
+                                <span class="current-temp" id="currentTemp">--°C</span>
+                                <span class="feels-like" id="feelsLike">Gefühlt: --°C</span>
+                            </div>
+                            <div class="weather-icon-desc">
+                                <div id="currentWeatherIcon" class="weather-icon-large">
+                                    <i data-lucide="cloud-sun"></i>
+                                </div>
+                                <span class="weather-desc" id="currentWeatherDesc">Lade Daten...</span>
+                            </div>
+                        </div>
+                        <div class="current-details-grid">
+                            <div class="detail-item">
+                                <i data-lucide="droplet"></i>
+                                <div>
+                                    <label>Luftfeuchte</label>
+                                    <span id="currentHumidity">--%</span>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <i data-lucide="wind"></i>
+                                <div>
+                                    <label>Wind / Böen</label>
+                                    <span id="currentWind">-- km/h</span>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <i data-lucide="cloud-rain"></i>
+                                <div>
+                                    <label>Niederschlag (1h)</label>
+                                    <span id="currentPrecipitation">-- mm</span>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <i data-lucide="gauge"></i>
+                                <div>
+                                    <label>Luftdruck</label>
+                                    <span id="currentPressure">-- hPa</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Landwirtschafts-Indizes -->
+                    <div class="card index-card">
+                        <h2>Ernte- & Arbeitskriterien</h2>
+                        <p class="card-intro">Spezifisch berechnete Indizes für landwirtschaftliche Arbeiten heute und in den nächsten Tagen.</p>
+                        
+                        <div class="index-items-container">
+                            <!-- Heuwetter -->
+                            <div class="index-item-row" id="indexRowHeu">
+                                <div class="index-meta">
+                                    <div class="index-title-area">
+                                        <i data-lucide="leaf" class="icon-heu"></i>
+                                        <span>Heuwetter-Index</span>
+                                    </div>
+                                    <span class="index-value" id="heuIndexVal">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar bg-heu" id="heuProgressBar" style="width: 0%"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="heuStatusBadge">Berechne...</span>
+                                    <span class="index-desc">Heuen erfordert 3 regenfreie Tage mit guter Trocknung.</span>
+                                </div>
+                            </div>
+
+                            <!-- Spritzwetter -->
+                            <div class="index-item-row" id="indexRowSpritz">
+                                <div class="index-meta">
+                                    <div class="index-title-area">
+                                        <i data-lucide="droplets" class="icon-spritz"></i>
+                                        <span>Spritzwetter (Pflanzenschutz)</span>
+                                    </div>
+                                    <span class="index-value" id="spritzIndexVal">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar bg-spritz" id="spritzProgressBar" style="width: 0%"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="spritzStatusBadge">Berechne...</span>
+                                    <span class="index-desc">Ideal bei Windstille (< 12 km/h) & trocken (> 6h nach Spritzung).</span>
+                                </div>
+                            </div>
+
+                            <!-- Gülle-Wetter -->
+                            <div class="index-item-row" id="indexRowGuelle">
+                                <div class="index-meta">
+                                    <div class="index-title-area">
+                                        <i data-lucide="sprout" class="icon-guelle"></i>
+                                        <span>Gülle ausbringen</span>
+                                    </div>
+                                    <span class="index-value" id="guelleIndexVal">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar bg-guelle" id="guelleProgressBar" style="width: 0%"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="guelleStatusBadge">Berechne...</span>
+                                    <span class="index-desc">Ideal bei Bewölkung / leichtem Regen (einsickern, Ammoniak-Schutz).</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7-TAGE VORHERSAGE MIT DETAILS -->
+                <div class="card forecast-card">
+                    <div class="forecast-header">
+                        <h2>7-Tage-Vorhersage & Heuwetter-Ampel</h2>
+                        <span class="hint"><i data-lucide="info"></i> Klicken Sie auf einen Tag für stündliche Details & Trocknungsparameter.</span>
+                    </div>
+                    
+                    <div class="forecast-list" id="forecastList">
+                        <!-- Wird dynamisch befüllt -->
+                        <div class="loading-state">
+                            <i data-lucide="loader-2" class="spin"></i>
+                            <span>Vorhersagedaten werden geladen...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DIAGRAMME -->
+                <div class="charts-grid">
+                    <div class="card chart-card">
+                        <h2>Temperatur & Taupunkt Verlauf (48h)</h2>
+                        <div class="chart-container">
+                            <canvas id="tempChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card chart-card">
+                        <h2>Niederschlag & Windböen Prognose (48h)</h2>
+                        <div class="chart-container">
+                            <canvas id="precipWindChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- TAB 2: REGENRADAR -->
+            <section id="tabContentRadar" class="tab-content">
+                <div class="card radar-card">
+                    <div class="radar-header">
+                        <h2>Live Regenradar Region Imst / Tirol</h2>
+                        <p>Das interaktive Windy-Radar zeigt aktuelle Niederschlagsfelder (Regen und Schnee) sowie deren Zugrichtung.</p>
+                    </div>
+                    
+                    <!-- Windy Iframe Container -->
+                    <div class="radar-iframe-wrapper">
+                        <iframe id="windyRadarIframe" src="" frameborder="0" allowfullscreen></iframe>
+                    </div>
+
+                    <!-- Quick links radar -->
+                    <div class="radar-quick-links">
+                        <h3>Alternative Radar- & Satellitenbilder</h3>
+                        <div class="links-grid-small">
+                            <a href="https://www.wetteronline.at/regenradar/tirol" target="_blank" rel="noopener" class="mini-link-card">
+                                <i data-lucide="external-link"></i>
+                                <span>WetterOnline Tirol</span>
+                            </a>
+                            <a href="https://kachelmannwetter.com/at/regenradar/tirol" target="_blank" rel="noopener" class="mini-link-card">
+                                <i data-lucide="external-link"></i>
+                                <span>Kachelmann Radar Tirol</span>
+                            </a>
+                            <a href="https://www.geosphere.at/de/wetter/wetteranimation" target="_blank" rel="noopener" class="mini-link-card">
+                                <i data-lucide="external-link"></i>
+                                <span>GeoSphere Wetteranimation</span>
+                            </a>
+                            <a href="https://www.bergfex.at/sommer/imst/wetter/niederschlag/" target="_blank" rel="noopener" class="mini-link-card">
+                                <i data-lucide="external-link"></i>
+                                <span>Bergfex Niederschlagsprognose</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: LINKS -->
+            <section id="tabContentLinks" class="tab-content">
+                <div class="links-intro-card card">
+                    <i data-lucide="info" class="intro-icon"></i>
+                    <div>
+                        <h2>Externe Agrar- & Wetterportale</h2>
+                        <p>Da verschiedene Wettermodelle unterschiedliche Ergebnisse liefern können, empfiehlt es sich für wichtige Entscheidungen (z.B. Mahd oder Düngung) mehrere verlässliche Portale zu vergleichen. Hier sind die wichtigsten Ressourcen für den Raum Imst:</p>
+                    </div>
+                </div>
+
+                <div class="portals-grid">
+                    <!-- Geosphere Austria -->
+                    <div class="card portal-card">
+                        <div class="portal-badge geosphere">Staatlich</div>
+                        <h3>GeoSphere Austria (ehem. ZAMG)</h3>
+                        <p>Der offizielle österreichische Wetterdienst. Bietet hochpräzise Regionalprognosen und detaillierte Warnungen vor Unwettern.</p>
+                        <a href="https://www.geosphere.at/de/wetter/prognosen/tirol" target="_blank" rel="noopener" class="portal-link-btn">
+                            GeoSphere Tirol aufrufen <i data-lucide="arrow-up-right"></i>
+                        </a>
+                    </div>
+
+                    <!-- Landwirtschaftskammer -->
+                    <div class="card portal-card">
+                        <div class="portal-badge lk">Agrar-Spezifisch</div>
+                        <h3>LK-Warndienst Tirol</h3>
+                        <p>Detaillierte Fachinformationen der Landwirtschaftskammer zu Pflanzenschutz, Düngung, Obstbau und Forstwirtschaft für Tirol.</p>
+                        <a href="https://warndienst.lko.at" target="_blank" rel="noopener" class="portal-link-btn">
+                            LK-Warndienst aufrufen <i data-lucide="arrow-up-right"></i>
+                        </a>
+                    </div>
+
+                    <!-- Kachelmannwetter -->
+                    <div class="card portal-card">
+                        <div class="portal-badge models">Modellvergleich</div>
+                        <h3>Kachelmannwetter Imst</h3>
+                        <p>Hervorragend geeignet für den Vergleich verschiedener Wettermodelle (ECMWF, GFS, ICON, etc.). Bietet das "Super-HD"-Modell.</p>
+                        <a href="https://kachelmannwetter.com/at/vorhersage/2775240-imst" target="_blank" rel="noopener" class="portal-link-btn">
+                            Kachelmannwetter Imst <i data-lucide="arrow-up-right"></i>
+                        </a>
+                    </div>
+
+                    <!-- Hydro Online -->
+                    <div class="card portal-card">
+                        <div class="portal-badge hydro">Gewässer & Boden</div>
+                        <h3>Hydro Online Tirol</h3>
+                        <p>Aktuelle Abflusswerte der Flüsse, Grundwasserstände und Messdaten der Wetterstationen des Landes Tirol.</p>
+                        <a href="https://hydro.tirol.gv.at" target="_blank" rel="noopener" class="portal-link-btn">
+                            Hydro Tirol aufrufen <i data-lucide="arrow-up-right"></i>
+                        </a>
+                    </div>
+
+                    <!-- Bergfex Wetter -->
+                    <div class="card portal-card">
+                        <div class="portal-badge bergfex">Bergwetter</div>
+                        <h3>Bergfex Wetter Imst</h3>
+                        <p>Detailliertes Wetter für die Outdoor- und Bergregion Imst. Hilfreich zur Einschätzung von orografischen Effekten (Gewitter in den Bergen).</p>
+                        <a href="https://www.bergfex.at/sommer/imst/wetter/" target="_blank" rel="noopener" class="portal-link-btn">
+                            Bergfex Imst Wetter <i data-lucide="arrow-up-right"></i>
+                        </a>
+                    </div>
+
+                    <!-- Land Tirol Wetterstationen -->
+                    <div class="card portal-card">
+                        <div class="portal-badge station">Live-Station</div>
+                        <h3>Meteo Report Imst</h3>
+                        <p>Messwerte lokaler Wetterstationen im Bezirk Imst mit historischen Datenreihen der letzten Tage.</p>
+                        <a href="https://www.meteo.report/de/tirol/imst" target="_blank" rel="noopener" class="portal-link-btn">
+                            Meteo Report Imst <i data-lucide="arrow-up-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <p>&copy; 2026 AgrarWetter Imst. Entwickelt für die Landwirtschaft im Bezirk Imst, Tirol.</p>
+            <p class="api-attribution">Wetterdaten bereitgestellt von <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo API</a>. Radar bereitgestellt von <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy</a>.</p>
+        </footer>
+    </div>
+
+    <!-- JS Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
