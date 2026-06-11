@@ -8,19 +8,61 @@ let weatherData = null;
 let tempChartInstance = null;
 let precipWindChartInstance = null;
 
-// Configurations
-const IMST_LAT = 47.2386;
-const IMST_LON = 10.7422;
+// Presets for locations in District Imst
+const LOCATIONS = {
+    imst: { lat: 47.2386, lon: 10.7422, label: "Imst (828m)" },
+    tarrenz: { lat: 47.2644, lon: 10.7617, label: "Tarrenz (836m)" },
+    roppen: { lat: 47.2181, lon: 10.8242, label: "Roppen (724m)" },
+    nassereith: { lat: 47.3150, lon: 10.8383, label: "Nassereith (838m)" },
+    silz: { lat: 47.2647, lon: 10.9272, label: "Silz (654m)" },
+    haiming: { lat: 47.2525, lon: 10.8856, label: "Haiming (670m)" },
+    laengenfeld: { lat: 47.0708, lon: 10.9714, label: "Längenfeld (1179m)" },
+    soelden: { lat: 46.9677, lon: 11.0078, label: "Sölden (1368m)" }
+};
+
+let currentLat = LOCATIONS.imst.lat;
+let currentLon = LOCATIONS.imst.lon;
+let currentLocationKey = 'imst';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize Lucide Icons
     lucide.createIcons();
+    
+    // Restore location from localStorage
+    const savedLoc = localStorage.getItem('agrarwetter_loc');
+    const savedLat = localStorage.getItem('agrarwetter_lat');
+    const savedLon = localStorage.getItem('agrarwetter_lon');
+    
+    if (savedLoc && LOCATIONS[savedLoc]) {
+        currentLocationKey = savedLoc;
+        currentLat = LOCATIONS[savedLoc].lat;
+        currentLon = LOCATIONS[savedLoc].lon;
+        document.getElementById('locationSelect').value = savedLoc;
+    } else if (savedLat && savedLon) {
+        currentLocationKey = 'gps';
+        currentLat = parseFloat(savedLat);
+        currentLon = parseFloat(savedLon);
+        
+        // Add GPS option dynamically if it was loaded
+        const select = document.getElementById('locationSelect');
+        let gpsOpt = select.querySelector('option[value="gps"]');
+        if (!gpsOpt) {
+            gpsOpt = document.createElement('option');
+            gpsOpt.value = 'gps';
+            select.appendChild(gpsOpt);
+        }
+        gpsOpt.textContent = `GPS: ${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}`;
+        select.value = 'gps';
+    }
     
     // Set Windy Radar Source
     initRadar();
     
     // Fetch Weather Data
     fetchWeatherData();
+    
+    // Register Service Worker for PWA
+    registerServiceWorker();
 });
 
 /**
@@ -39,6 +81,9 @@ function switchTab(tabName) {
     } else if (tabName === 'radar') {
         document.getElementById('tabBtnRadar').classList.add('active');
         document.getElementById('tabContentRadar').classList.add('active-content');
+    } else if (tabName === 'agro') {
+        document.getElementById('tabBtnAgro').classList.add('active');
+        document.getElementById('tabContentAgro').classList.add('active-content');
     } else if (tabName === 'links') {
         document.getElementById('tabBtnLinks').classList.add('active');
         document.getElementById('tabContentLinks').classList.add('active-content');
@@ -51,8 +96,7 @@ function switchTab(tabName) {
 function initRadar() {
     const radarIframe = document.getElementById('windyRadarIframe');
     if (radarIframe) {
-        // Windy Embed URL with coordinates for Imst
-        radarIframe.src = `https://embed.windy.com/embed2.html?lat=${IMST_LAT}&lon=${IMST_LON}&zoom=9&level=surface&overlay=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+        radarIframe.src = `https://embed.windy.com/embed2.html?lat=${currentLat}&lon=${currentLon}&zoom=9&level=surface&overlay=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
     }
 }
 
@@ -60,7 +104,7 @@ function initRadar() {
  * Fetch Weather Data from Open-Meteo
  */
 async function fetchWeatherData() {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${IMST_LAT}&longitude=${IMST_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration&timezone=Europe%2FBerlin`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_0_to_10cm,soil_moisture_0_to_10cm&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration&timezone=Europe%2FBerlin`;
     
     try {
         const response = await fetch(url);
@@ -76,6 +120,8 @@ async function fetchWeatherData() {
         updateIndicesUI(indices);
         
         updateForecastUI(weatherData.daily, weatherData.hourly);
+        
+        updateSoilHealthUI(weatherData.hourly);
         
         renderCharts(weatherData.hourly);
         
@@ -512,6 +558,9 @@ function updateForecastUI(daily, hourly) {
             heuBadgeText = heuIdx > 0 ? `Heuen: Riskant (${heuIdx}%)` : 'Heuen: Nein (0%)';
         }
         
+        // Simulate Hay-Drying Clock (ET0 and Rain hours)
+        const dryingInfo = simulateHayDrying(i, daily, hourly);
+        
         // Generate Hourly Table Content for this day
         const hourlyRowsHtml = generateHourlyRowsForDay(i, dateStr, hourly);
         
@@ -547,6 +596,13 @@ function updateForecastUI(daily, hourly) {
             </div>
             
             <div class="day-hourly-details">
+                <div class="drying-clock-container ${dryingInfo.class}">
+                    <i data-lucide="${dryingInfo.icon}"></i>
+                    <div class="drying-clock-text">
+                        <span class="drying-clock-title">Heu-Trocknungsuhr:</span>
+                        <span class="drying-clock-time">${dryingInfo.text}</span>
+                    </div>
+                </div>
                 <div class="hourly-table-wrapper">
                     <table class="hourly-table">
                         <thead>
@@ -826,4 +882,362 @@ function renderCharts(hourly) {
             }
         }
     });
+}
+
+/**
+ * Handle selection change in the location dropdown
+ */
+function handleLocationChange() {
+    const select = document.getElementById('locationSelect');
+    const value = select.value;
+    
+    if (value === 'gps') {
+        requestGPSLocation();
+        return;
+    }
+    
+    if (LOCATIONS[value]) {
+        currentLocationKey = value;
+        currentLat = LOCATIONS[value].lat;
+        currentLon = LOCATIONS[value].lon;
+        
+        // Save to localStorage
+        localStorage.setItem('agrarwetter_loc', value);
+        localStorage.removeItem('agrarwetter_lat');
+        localStorage.removeItem('agrarwetter_lon');
+        
+        // Refresh UI
+        initRadar();
+        fetchWeatherData();
+    }
+}
+
+/**
+ * Request GPS Coordinates from the Browser
+ */
+function requestGPSLocation() {
+    const gpsBtn = document.getElementById('gpsBtn');
+    gpsBtn.classList.add('searching');
+    
+    if (!navigator.geolocation) {
+        alert("GPS-Ortung wird von diesem Browser nicht unterstützt.");
+        gpsBtn.classList.remove('searching');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            currentLat = position.coords.latitude;
+            currentLon = position.coords.longitude;
+            currentLocationKey = 'gps';
+            
+            // Save to localStorage
+            localStorage.removeItem('agrarwetter_loc');
+            localStorage.setItem('agrarwetter_lat', currentLat);
+            localStorage.setItem('agrarwetter_lon', currentLon);
+            
+            // Update dropdown display
+            const select = document.getElementById('locationSelect');
+            let gpsOpt = select.querySelector('option[value="gps"]');
+            if (!gpsOpt) {
+                gpsOpt = document.createElement('option');
+                gpsOpt.value = 'gps';
+                select.appendChild(gpsOpt);
+            }
+            gpsOpt.textContent = `GPS: ${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}`;
+            select.value = 'gps';
+            
+            gpsBtn.classList.remove('searching');
+            
+            // Refresh UI
+            initRadar();
+            fetchWeatherData();
+        },
+        (error) => {
+            console.error("GPS Fehler:", error);
+            alert("Standort konnte nicht ermittelt werden. Fallback auf Imst.");
+            gpsBtn.classList.remove('searching');
+            // Fallback to Imst
+            const select = document.getElementById('locationSelect');
+            select.value = 'imst';
+            handleLocationChange();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+/**
+ * Simulate Hay Drying using hourly ET0 and rain hours
+ */
+function simulateHayDrying(dayIndex, daily, hourly) {
+    const rainProb = daily.precipitation_probability_max[dayIndex];
+    const rainSum = daily.precipitation_sum[dayIndex];
+    
+    // Find index of 08:00 AM of the mowing day in the hourly array
+    const dateStr = daily.time[dayIndex];
+    let startH = -1;
+    for (let h = 0; h < hourly.time.length; h++) {
+        if (hourly.time[h].startsWith(dateStr) && hourly.time[h].includes("T08:00")) {
+            startH = h;
+            break;
+        }
+    }
+    
+    if (startH === -1) {
+        for (let h = 0; h < hourly.time.length; h++) {
+            if (hourly.time[h].startsWith(dateStr)) {
+                startH = h;
+                break;
+            }
+        }
+    }
+    
+    // If starting rain risk is too high
+    if (rainSum >= 1.5 || rainProb >= 35) {
+        return {
+            text: "Mähen heute NICHT empfohlen (Regenrisiko!)",
+            icon: "alert-triangle",
+            class: "warning-rain"
+        };
+    }
+    
+    let cumulativeEt = 0;
+    let hoursNeeded = 0;
+    let rainInterrupted = false;
+    let rainHour = -1;
+    
+    const maxHours = Math.min(hourly.time.length - startH, 96); // max 4 days
+    
+    for (let h = 0; h < maxHours; h++) {
+        const idx = startH + h;
+        const currentRain = hourly.precipitation[idx] || 0;
+        const currentEt = hourly.evapotranspiration[idx] || 0;
+        
+        if (currentRain > 0.2) {
+            rainInterrupted = true;
+            rainHour = h;
+            break;
+        }
+        
+        cumulativeEt += currentEt;
+        hoursNeeded++;
+        
+        if (cumulativeEt >= 10.0) {
+            break;
+        }
+    }
+    
+    if (rainInterrupted) {
+        const timeObj = new Date(hourly.time[startH + rainHour]);
+        const dayNamesShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+        const dayFormatted = dayNamesShort[timeObj.getDay()];
+        const hourFormatted = timeObj.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+        return {
+            text: `Regenrisiko nach ${rainHour} Std. (${dayFormatted} ${hourFormatted} Uhr)! Trocknung unterbrochen.`,
+            icon: "cloud-rain",
+            class: "warning-rain"
+        };
+    }
+    
+    if (cumulativeEt >= 10.0) {
+        const timeObj = new Date(hourly.time[startH + hoursNeeded]);
+        const dayNamesShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+        const dayFormatted = dayNamesShort[timeObj.getDay()];
+        const hourFormatted = timeObj.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+        
+        let timeDesc = `${hoursNeeded} Std.`;
+        if (hoursNeeded > 24) {
+            const days = Math.floor(hoursNeeded / 24);
+            const extra = hoursNeeded % 24;
+            timeDesc = `${days} Tag(e) und ${extra} Std.`;
+        }
+        
+        return {
+            text: `Einfahrbereit in ca. ${timeDesc} (am ${dayFormatted} gegen ${hourFormatted} Uhr, ET₀: ${cumulativeEt.toFixed(1)}mm)`,
+            icon: "check-circle",
+            class: ""
+        };
+    }
+    
+    return {
+        text: `Trocknung unvollständig (> 96 Std., ET₀ erreicht nur ${cumulativeEt.toFixed(1)}mm)`,
+        icon: "cloud-sun",
+        class: ""
+    };
+}
+
+/**
+ * Update Soil and Plant Health UI (Agro Tab)
+ */
+function updateSoilHealthUI(hourly) {
+    const soilTemp = hourly.soil_temperature_0_to_10cm[0];
+    const soilMoistureFraction = hourly.soil_moisture_0_to_10cm[0];
+    const soilMoistPercent = Math.round(soilMoistureFraction * 100);
+    
+    document.getElementById('soilTempVal').textContent = `${soilTemp.toFixed(1)} °C`;
+    document.getElementById('soilMoistVal').textContent = `${soilMoistPercent} %`;
+    document.getElementById('soilMoistBar').style.width = `${soilMoistPercent}%`;
+    
+    const tempStatus = document.getElementById('soilTempStatus');
+    const tempDesc = document.getElementById('soilTempDesc');
+    tempStatus.className = 'status-pill';
+    
+    if (soilTemp <= 0) {
+        tempStatus.textContent = "Bodenfrost";
+        tempStatus.classList.add('danger');
+        tempDesc.textContent = "Boden gefroren. Keine Keimung möglich.";
+    } else if (soilTemp < 8) {
+        tempStatus.textContent = "Kalt";
+        tempStatus.classList.add('warning');
+        tempDesc.textContent = "Zu kalt für die Keimung von Mais & Kartoffeln (< 8°C).";
+    } else if (soilTemp < 15) {
+        tempStatus.textContent = "Mäßig warm";
+        tempStatus.classList.add('info');
+        tempDesc.textContent = "Aussaat von Mais und Kartoffeln möglich.";
+    } else {
+        tempStatus.textContent = "Sehr gut";
+        tempStatus.classList.add('success');
+        tempDesc.textContent = "Optimale Keimbedingungen für wärmeliebende Kulturen.";
+    }
+    
+    const moistStatus = document.getElementById('soilMoistStatus');
+    const moistDesc = document.getElementById('soilMoistDesc');
+    moistStatus.className = 'status-pill';
+    
+    if (soilMoistPercent < 15) {
+        moistStatus.textContent = "Trocken";
+        moistStatus.classList.add('danger');
+        moistDesc.textContent = "Kritischer Dürrebereich. Künstliche Bewässerung empfohlen.";
+    } else if (soilMoistPercent < 25) {
+        moistStatus.textContent = "Mäßig trocken";
+        moistStatus.classList.add('warning');
+        moistDesc.textContent = "Bodenfeuchte gering, Pflanzenwachstum verlangsamt.";
+    } else if (soilMoistPercent < 40) {
+        moistStatus.textContent = "Optimal";
+        moistStatus.classList.add('success');
+        moistDesc.textContent = "Perfekter Wassergehalt für Nährstoffaufnahme.";
+    } else {
+        moistStatus.textContent = "Nass";
+        moistStatus.classList.add('info');
+        moistDesc.textContent = "Boden stark wassergesättigt. Vorsicht bei Befahrung.";
+    }
+    
+    const health = calculateAgroHealthIndices(hourly);
+    
+    document.getElementById('beeIndexVal').textContent = `${health.bee}%`;
+    document.getElementById('beeProgressBar').style.width = `${health.bee}%`;
+    const beeBadge = document.getElementById('beeStatusBadge');
+    beeBadge.className = 'status-pill';
+    if (health.bee >= 75) { beeBadge.textContent = "Sehr aktiv"; beeBadge.classList.add('success'); }
+    else if (health.bee >= 35) { beeBadge.textContent = "Mäßig"; beeBadge.classList.add('warning'); }
+    else { beeBadge.textContent = "Kaum Aktiv"; beeBadge.classList.add('danger'); }
+    
+    document.getElementById('scabIndexVal').textContent = `${health.scab}%`;
+    document.getElementById('scabProgressBar').style.width = `${health.scab}%`;
+    const scabBadge = document.getElementById('scabStatusBadge');
+    scabBadge.className = 'status-pill';
+    if (health.scab >= 70) { scabBadge.textContent = "Sehr hoch"; scabBadge.classList.add('danger'); }
+    else if (health.scab >= 35) { scabBadge.textContent = "Mäßig"; scabBadge.classList.add('warning'); }
+    else { scabBadge.textContent = "Gering"; scabBadge.classList.add('success'); }
+    
+    document.getElementById('blightIndexVal').textContent = `${health.blight}%`;
+    document.getElementById('blightProgressBar').style.width = `${health.blight}%`;
+    const blightBadge = document.getElementById('blightStatusBadge');
+    blightBadge.className = 'status-pill';
+    if (health.blight >= 70) { blightBadge.textContent = "Sehr hoch"; blightBadge.classList.add('danger'); }
+    else if (health.blight >= 35) { blightBadge.textContent = "Mäßig"; blightBadge.classList.add('warning'); }
+    else { blightBadge.textContent = "Gering"; blightBadge.classList.add('success'); }
+}
+
+/**
+ * Calculate Biological Indicators (Bees, Scab, Blight) for the next 24 hours
+ */
+function calculateAgroHealthIndices(hourly) {
+    let beeSum = 0;
+    let beeCount = 0;
+    
+    for (let h = 0; h < 24; h++) {
+        const timeObj = new Date(hourly.time[h]);
+        const hour = timeObj.getHours();
+        
+        if (hour >= 6 && hour <= 18) {
+            const temp = hourly.temperature_2m[h];
+            const wind = hourly.wind_speed_10m[h];
+            const rain = hourly.precipitation[h] || 0.0;
+            
+            let tFactor = 0;
+            if (temp >= 18) tFactor = 1.0;
+            else if (temp >= 12) tFactor = (temp - 12) / 6;
+            
+            let wFactor = 0;
+            if (wind < 10) wFactor = 1.0;
+            else if (wind < 25) wFactor = 1.0 - ((wind - 10) / 15);
+            
+            let rFactor = rain > 0 ? 0.0 : 1.0;
+            
+            beeSum += (tFactor * wFactor * rFactor * 100);
+            beeCount++;
+        }
+    }
+    const beeIndex = beeCount > 0 ? Math.round(beeSum / beeCount) : 0;
+    
+    let maxWetHours = 0;
+    let currentWetHours = 0;
+    let wetTempSum = 0;
+    
+    for (let h = 0; h < 24; h++) {
+        const rh = hourly.relative_humidity_2m[h];
+        const temp = hourly.temperature_2m[h];
+        
+        if (rh >= 85) {
+            currentWetHours++;
+            wetTempSum += temp;
+            if (currentWetHours > maxWetHours) {
+                maxWetHours = currentWetHours;
+            }
+        } else {
+            currentWetHours = 0;
+        }
+    }
+    
+    let scabIndex = 0;
+    if (maxWetHours > 0) {
+        const avgWetTemp = wetTempSum / maxWetHours;
+        let reqHours = 28;
+        if (avgWetTemp >= 6 && avgWetTemp < 9) reqHours = 21;
+        else if (avgWetTemp >= 9 && avgWetTemp < 12) reqHours = 14;
+        else if (avgWetTemp >= 12 && avgWetTemp <= 24) reqHours = 9;
+        else if (avgWetTemp > 24 && avgWetTemp <= 27) reqHours = 12;
+        
+        scabIndex = Math.min(100, Math.round((maxWetHours / reqHours) * 100));
+    }
+    
+    let blightHours = 0;
+    for (let h = 0; h < 24; h++) {
+        const rh = hourly.relative_humidity_2m[h];
+        const temp = hourly.temperature_2m[h];
+        if (rh >= 90 && temp >= 10 && temp <= 24) {
+            blightHours++;
+        }
+    }
+    const blightIndex = Math.min(100, Math.round((blightHours / 12) * 100));
+    
+    return {
+        bee: beeIndex,
+        scab: scabIndex,
+        blight: blightIndex
+    };
+}
+
+/**
+ * Register Service Worker for PWA
+ */
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('Service Worker registriert. Scope:', reg.scope))
+                .catch(err => console.error('Service Worker Registrierung fehlgeschlagen:', err));
+        });
+    }
 }

@@ -942,6 +942,190 @@ a:hover {
     font-size: 0.75rem;
 }
 
+/* 12. Location Selector & GPS Button */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+#locationSelect {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: #ffffff;
+    border-radius: 99px;
+    padding: 0.5rem 2.25rem 0.5rem 2.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+#locationSelect:hover, #locationSelect:focus {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.select-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: var(--color-primary);
+    pointer-events: none;
+}
+
+.select-wrapper::after {
+    content: "";
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #ffffff;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.gps-btn {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: var(--color-primary-hover);
+    border-radius: 99px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-header);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    outline: none;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.gps-btn:hover {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.gps-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.gps-btn.searching {
+    animation: gps-pulse-anim 1.5s infinite ease-in-out;
+    background: rgba(6, 182, 212, 0.15);
+    border-color: var(--color-info);
+    color: #cffafe;
+}
+
+@keyframes gps-pulse-anim {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* 13. Bodendaten (Agro Tab) */
+.agro-metric-row {
+    background: rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+}
+
+.metric-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #ffffff;
+}
+
+.metric-label svg {
+    width: 18px;
+    height: 18px;
+    color: var(--color-primary);
+}
+
+.metric-value {
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* 14. Heutrocknungs-Uhr (Accordion Widget) */
+.drying-clock-container {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    margin: 0.75rem 1rem 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.02);
+}
+
+.drying-clock-container.warning-rain {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.drying-clock-container.warning-rain svg {
+    color: var(--color-danger);
+}
+
+.drying-clock-container svg {
+    width: 20px;
+    height: 20px;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.drying-clock-text {
+    color: var(--color-text-muted);
+}
+
+.drying-clock-title {
+    font-weight: 600;
+    color: #ffffff;
+    margin-right: 0.25rem;
+}
+
+.drying-clock-time {
+    color: var(--color-primary-hover);
+    font-weight: 700;
+}
+
+.drying-clock-container.warning-rain .drying-clock-time {
+    color: #fca5a5;
+}
+
 /* ==========================================================================
    MEDIA QUERIES (RESPONSIVE DESIGN)
    ========================================================================== */
@@ -968,6 +1152,25 @@ a:hover {
     .header-main {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .header-controls {
+        width: 100%;
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    
+    .select-wrapper {
+        flex-grow: 1;
+    }
+    
+    #locationSelect {
+        width: 100%;
+    }
+    
+    .gps-btn {
+        flex-shrink: 0;
     }
     
     .logo-area {

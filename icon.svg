@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="128" fill="#0b0f19"/>
+  <circle cx="256" cy="256" r="220" fill="url(#grad)" opacity="0.1"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <!-- Beautiful Tractor / Sun SVG -->
+  <path d="M120 320a48 48 0 1 0 0 96 48 48 0 1 0 0-96zm240 0a64 64 0 1 0 0 128 64 64 0 1 0 0-128zm-160-80v80h60v-80h-60zm90-80v80h60v-80h-60zm-180 80h60v-60h-60v60zm140-140v60h60v-60h-60zm-180 60V140h60v40h120V100h60v80h-60v60h60v40h-80v-60h-60v60h-100zm120-100h60v-40h-60v40z" fill="url(#grad)"/>
+  <circle cx="400" cy="120" r="40" fill="#f59e0b" opacity="0.85"/>
+  <line x1="400" y1="60" x2="400" y2="40" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"/>
+  <line x1="400" y1="180" x2="400" y2="200" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"/>
+  <line x1="340" y1="120" x2="320" y2="120" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"/>
+  <line x1="460" y1="120" x2="480" y2="120" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"/>
+</svg>

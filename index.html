@@ -14,6 +14,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- CSS Stylesheet -->
     <link rel="stylesheet" href="index.css">
+    <!-- Web App Manifest for PWA -->
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div class="app-container">
@@ -27,9 +29,23 @@
                         <p class="subtitle">Wetterdaten & Heuwetter-Index für die Tiroler Landwirtschaft</p>
                     </div>
                 </div>
-                <div class="location-badge" id="locationBadge">
-                    <i data-lucide="map-pin"></i>
-                    <span>Imst, Tirol (828m)</span>
+                <div class="header-controls">
+                    <div class="select-wrapper">
+                        <select id="locationSelect" onchange="handleLocationChange()">
+                            <option value="imst" selected>Imst (828m)</option>
+                            <option value="tarrenz">Tarrenz (836m)</option>
+                            <option value="roppen">Roppen (724m)</option>
+                            <option value="nassereith">Nassereith (838m)</option>
+                            <option value="silz">Silz (654m)</option>
+                            <option value="haiming">Haiming (670m)</option>
+                            <option value="laengenfeld">Längenfeld (1179m)</option>
+                            <option value="soelden">Sölden (1368m)</option>
+                        </select>
+                        <i data-lucide="map-pin" class="select-icon"></i>
+                    </div>
+                    <button class="gps-btn" id="gpsBtn" onclick="requestGPSLocation()" title="Aktuellen Standort über GPS ermitteln">
+                        <i data-lucide="locate"></i> <span>GPS</span>
+                    </button>
                 </div>
             </div>
             
@@ -40,6 +56,9 @@
                 </button>
                 <button class="tab-btn" id="tabBtnRadar" onclick="switchTab('radar')">
                     <i data-lucide="radar"></i> Regenradar
+                </button>
+                <button class="tab-btn" id="tabBtnAgro" onclick="switchTab('agro')">
+                    <i data-lucide="sprout"></i> Bodendaten & Gesundheit
                 </button>
                 <button class="tab-btn" id="tabBtnLinks" onclick="switchTab('links')">
                     <i data-lucide="external-link"></i> Agrar-Infoportale
@@ -241,6 +260,108 @@
                                 <i data-lucide="external-link"></i>
                                 <span>Bergfex Niederschlagsprognose</span>
                             </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: AGRO (BODENDATEN & GESUNDHEIT) -->
+            <section id="tabContentAgro" class="tab-content">
+                <div class="dashboard-grid">
+                    <!-- Bodendaten Card -->
+                    <div class="card agro-card">
+                        <h2><i data-lucide="layers"></i> Bodenzustand (0 - 10cm)</h2>
+                        <p class="card-intro">Aktuelle Bodenparameter für Aussaat und Bewirtschaftung.</p>
+                        
+                        <div class="agro-metrics-container">
+                            <!-- Bodentemperatur -->
+                            <div class="agro-metric-row">
+                                <div class="metric-meta">
+                                    <span class="metric-label"><i data-lucide="thermometer"></i> Bodentemperatur</span>
+                                    <span class="metric-value" id="soilTempVal">-- °C</span>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="soilTempStatus">Lade...</span>
+                                    <span class="index-desc" id="soilTempDesc">Erforderlich für Keimung.</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Bodenfeuchtigkeit -->
+                            <div class="agro-metric-row">
+                                <div class="metric-meta">
+                                    <span class="metric-label"><i data-lucide="droplet"></i> Bodenfeuchte (Vol-%)</span>
+                                    <span class="metric-value" id="soilMoistVal">-- %</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar bg-spritz" id="soilMoistBar" style="width: 0%"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="soilMoistStatus">Lade...</span>
+                                    <span class="index-desc" id="soilMoistDesc">Verfügbares Bodenwasser.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pflanzengesundheit & Nützlinge Card -->
+                    <div class="card health-card">
+                        <h2><i data-lucide="shield-alert"></i> Pflanzengesundheit & Nützlinge</h2>
+                        <p class="card-intro">Biologische Risiken und Flugbedingungen für Bestäuber.</p>
+                        
+                        <div class="index-items-container">
+                            <!-- Bienenflug -->
+                            <div class="index-item-row">
+                                <div class="index-meta">
+                                    <div class="index-title-area">
+                                        <i data-lucide="activity" style="color: #f59e0b;"></i>
+                                        <span>Bienenflug-Aktivität</span>
+                                    </div>
+                                    <span class="index-value" id="beeIndexVal">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="beeProgressBar" style="width: 0%; background: linear-gradient(90deg, #d97706, #f59e0b);"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="beeStatusBadge">Berechne...</span>
+                                    <span class="index-desc">Flugaktivität von Wild- und Honigbienen.</span>
+                                </div>
+                            </div>
+
+                            <!-- Apfelschorf -->
+                            <div class="index-item-row">
+                                <div class="index-meta">
+                                    <div class="index-title-area">
+                                        <i data-lucide="bug" style="color: #ec4899;"></i>
+                                        <span>Apfelschorf-Risiko (Fungi)</span>
+                                    </div>
+                                    <span class="index-value" id="scabIndexVal">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="scabProgressBar" style="width: 0%; background: linear-gradient(90deg, #ec4899, #f43f5e);"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="scabStatusBadge">Berechne...</span>
+                                    <span class="index-desc">Infektionsrisiko bei feucht-warmem Laub.</span>
+                                </div>
+                            </div>
+
+                            <!-- Krautfäule -->
+                            <div class="index-item-row">
+                                <div class="index-meta">
+                                    <div class="index-title-area">
+                                        <i data-lucide="skull" style="color: #ef4444;"></i>
+                                        <span>Kraut- & Knollenfäule (Kartoffel)</span>
+                                    </div>
+                                    <span class="index-value" id="blightIndexVal">--%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="blightProgressBar" style="width: 0%; background: linear-gradient(90deg, #dc2626, #ef4444);"></div>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="blightStatusBadge">Berechne...</span>
+                                    <span class="index-desc">Sporenkeimungs-Risiko bei anhaltender Nässe.</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
