@@ -1262,3 +1262,10 @@ a:hover {
         height: 350px;
     }
 }
+
+/* Loading fade effect for smooth UI refresh */
+.loading-fade {
+    opacity: 0.55;
+    pointer-events: none;
+    transition: opacity 0.22s ease-in-out;
+}

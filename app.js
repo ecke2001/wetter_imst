@@ -24,6 +24,22 @@ let currentLat = LOCATIONS.imst.lat;
 let currentLon = LOCATIONS.imst.lon;
 let currentLocationKey = 'imst';
 
+/**
+ * Helper: Find nearest predefined municipality to given coordinates
+ */
+function findNearestLocation(lat, lon) {
+    let nearestKey = 'imst';
+    let minDistance = Infinity;
+    for (const [key, loc] of Object.entries(LOCATIONS)) {
+        const dist = Math.sqrt(Math.pow(lat - loc.lat, 2) + Math.pow(lon - loc.lon, 2));
+        if (dist < minDistance) {
+            minDistance = dist;
+            nearestKey = key;
+        }
+    }
+    return nearestKey;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize Lucide Icons
     lucide.createIcons();
@@ -43,6 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentLat = parseFloat(savedLat);
         currentLon = parseFloat(savedLon);
         
+        const nearestKey = findNearestLocation(currentLat, currentLon);
+        const nearestName = LOCATIONS[nearestKey].label.split(' (')[0];
+        
         // Add GPS option dynamically if it was loaded
         const select = document.getElementById('locationSelect');
         let gpsOpt = select.querySelector('option[value="gps"]');
@@ -51,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gpsOpt.value = 'gps';
             select.appendChild(gpsOpt);
         }
-        gpsOpt.textContent = `GPS: ${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}`;
+        gpsOpt.textContent = `GPS (nahe ${nearestName})`;
         select.value = 'gps';
     }
     
@@ -61,8 +80,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch Weather Data
     fetchWeatherData();
     
-    // Register Service Worker for PWA
-    registerServiceWorker();
+    // Unregister any active service worker and clear caches to ensure fresh data
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister().then(() => {
+                    console.log('Service Worker successfully unregistered');
+                });
+            }
+        });
+    }
+    if ('caches' in window) {
+        caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(key) {
+                return caches.delete(key);
+            }));
+        }).then(() => {
+            console.log('All caches cleared');
+        });
+    }
 });
 
 /**
@@ -81,6 +117,7 @@ function switchTab(tabName) {
     } else if (tabName === 'radar') {
         document.getElementById('tabBtnRadar').classList.add('active');
         document.getElementById('tabContentRadar').classList.add('active-content');
+        initRadar();
     } else if (tabName === 'agro') {
         document.getElementById('tabBtnAgro').classList.add('active');
         document.getElementById('tabContentAgro').classList.add('active-content');
@@ -90,13 +127,23 @@ function switchTab(tabName) {
     }
 }
 
+let radarLoadedLat = null;
+let radarLoadedLon = null;
+
 /**
- * Initialize Windy Radar iframe URL dynamically
+ * Initialize Windy Radar iframe URL dynamically (lazy-loaded when tab is active)
  */
-function initRadar() {
+function initRadar(force = false) {
     const radarIframe = document.getElementById('windyRadarIframe');
     if (radarIframe) {
-        radarIframe.src = `https://embed.windy.com/embed2.html?lat=${currentLat}&lon=${currentLon}&zoom=9&level=surface&overlay=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+        const isRadarTabActive = document.getElementById('tabContentRadar').classList.contains('active-content');
+        if (isRadarTabActive || force) {
+            if (radarLoadedLat !== currentLat || radarLoadedLon !== currentLon) {
+                radarIframe.src = `https://embed.windy.com/embed2.html?lat=${currentLat}&lon=${currentLon}&zoom=9&level=surface&overlay=radar&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+                radarLoadedLat = currentLat;
+                radarLoadedLon = currentLon;
+            }
+        }
     }
 }
 
@@ -104,7 +151,19 @@ function initRadar() {
  * Fetch Weather Data from Open-Meteo
  */
 async function fetchWeatherData() {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_0_to_10cm,soil_moisture_0_to_10cm&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration&timezone=Europe%2FBerlin`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,et0_fao_evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_6cm,soil_moisture_3_to_9cm&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration&timezone=Europe%2FBerlin`;
+    
+    // Show loading state in UI
+    const updateTimeEl = document.getElementById('updateTime');
+    if (updateTimeEl) {
+        updateTimeEl.innerHTML = '<i data-lucide="loader-2" class="spin" style="display:inline-block; vertical-align:middle; margin-right:5px; width:14px; height:14px;"></i> Wetterdaten werden geladen...';
+        lucide.createIcons();
+    }
+    
+    const appContent = document.querySelector('.app-content');
+    if (appContent) {
+        appContent.classList.add('loading-fade');
+    }
     
     try {
         const response = await fetch(url);
@@ -141,6 +200,10 @@ async function fetchWeatherData() {
         alertPill.style.borderColor = '#ef4444';
         alertText.textContent = "Verbindungsfehler. Bitte Internetverbindung prüfen.";
         alertText.style.color = '#fecaca';
+    } finally {
+        if (appContent) {
+            appContent.classList.remove('loading-fade');
+        }
     }
 }
 
@@ -651,7 +714,7 @@ function generateHourlyRowsForDay(dayIndex, dateStr, hourly) {
             const rh = hourly.relative_humidity_2m[h];
             const wind = Math.round(hourly.wind_speed_10m[h]);
             const gust = Math.round(hourly.wind_gusts_10m[h]);
-            const et = hourly.evapotranspiration[h] ? hourly.evapotranspiration[h].toFixed(2) : '0.00';
+            const et = hourly.et0_fao_evapotranspiration[h] ? hourly.et0_fao_evapotranspiration[h].toFixed(2) : '0.00';
             
             // Only show key farming hours: 06:00, 09:00, 12:00, 15:00, 18:00, 21:00 to keep layout readable
             const hourInt = timeObj.getHours();
@@ -937,6 +1000,9 @@ function requestGPSLocation() {
             localStorage.setItem('agrarwetter_lon', currentLon);
             
             // Update dropdown display
+            const nearestKey = findNearestLocation(currentLat, currentLon);
+            const nearestName = LOCATIONS[nearestKey].label.split(' (')[0];
+            
             const select = document.getElementById('locationSelect');
             let gpsOpt = select.querySelector('option[value="gps"]');
             if (!gpsOpt) {
@@ -944,7 +1010,7 @@ function requestGPSLocation() {
                 gpsOpt.value = 'gps';
                 select.appendChild(gpsOpt);
             }
-            gpsOpt.textContent = `GPS: ${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}`;
+            gpsOpt.textContent = `GPS (nahe ${nearestName})`;
             select.value = 'gps';
             
             gpsBtn.classList.remove('searching');
@@ -1011,7 +1077,7 @@ function simulateHayDrying(dayIndex, daily, hourly) {
     for (let h = 0; h < maxHours; h++) {
         const idx = startH + h;
         const currentRain = hourly.precipitation[idx] || 0;
-        const currentEt = hourly.evapotranspiration[idx] || 0;
+        const currentEt = hourly.et0_fao_evapotranspiration[idx] || 0;
         
         if (currentRain > 0.2) {
             rainInterrupted = true;
@@ -1070,56 +1136,78 @@ function simulateHayDrying(dayIndex, daily, hourly) {
  * Update Soil and Plant Health UI (Agro Tab)
  */
 function updateSoilHealthUI(hourly) {
-    const soilTemp = hourly.soil_temperature_0_to_10cm[0];
-    const soilMoistureFraction = hourly.soil_moisture_0_to_10cm[0];
-    const soilMoistPercent = Math.round(soilMoistureFraction * 100);
+    const hasSoilTemp = hourly && hourly.soil_temperature_6cm && hourly.soil_temperature_6cm[0] !== null && hourly.soil_temperature_6cm[0] !== undefined;
+    const hasSoilMoist = hourly && hourly.soil_moisture_3_to_9cm && hourly.soil_moisture_3_to_9cm[0] !== null && hourly.soil_moisture_3_to_9cm[0] !== undefined;
     
-    document.getElementById('soilTempVal').textContent = `${soilTemp.toFixed(1)} °C`;
-    document.getElementById('soilMoistVal').textContent = `${soilMoistPercent} %`;
-    document.getElementById('soilMoistBar').style.width = `${soilMoistPercent}%`;
+    const soilTempValElement = document.getElementById('soilTempVal');
+    const soilMoistValElement = document.getElementById('soilMoistVal');
+    const soilMoistBarElement = document.getElementById('soilMoistBar');
     
     const tempStatus = document.getElementById('soilTempStatus');
     const tempDesc = document.getElementById('soilTempDesc');
-    tempStatus.className = 'status-pill';
-    
-    if (soilTemp <= 0) {
-        tempStatus.textContent = "Bodenfrost";
-        tempStatus.classList.add('danger');
-        tempDesc.textContent = "Boden gefroren. Keine Keimung möglich.";
-    } else if (soilTemp < 8) {
-        tempStatus.textContent = "Kalt";
-        tempStatus.classList.add('warning');
-        tempDesc.textContent = "Zu kalt für die Keimung von Mais & Kartoffeln (< 8°C).";
-    } else if (soilTemp < 15) {
-        tempStatus.textContent = "Mäßig warm";
-        tempStatus.classList.add('info');
-        tempDesc.textContent = "Aussaat von Mais und Kartoffeln möglich.";
-    } else {
-        tempStatus.textContent = "Sehr gut";
-        tempStatus.classList.add('success');
-        tempDesc.textContent = "Optimale Keimbedingungen für wärmeliebende Kulturen.";
-    }
-    
     const moistStatus = document.getElementById('soilMoistStatus');
     const moistDesc = document.getElementById('soilMoistDesc');
+    
+    tempStatus.className = 'status-pill';
     moistStatus.className = 'status-pill';
     
-    if (soilMoistPercent < 15) {
-        moistStatus.textContent = "Trocken";
-        moistStatus.classList.add('danger');
-        moistDesc.textContent = "Kritischer Dürrebereich. Künstliche Bewässerung empfohlen.";
-    } else if (soilMoistPercent < 25) {
-        moistStatus.textContent = "Mäßig trocken";
-        moistStatus.classList.add('warning');
-        moistDesc.textContent = "Bodenfeuchte gering, Pflanzenwachstum verlangsamt.";
-    } else if (soilMoistPercent < 40) {
-        moistStatus.textContent = "Optimal";
-        moistStatus.classList.add('success');
-        moistDesc.textContent = "Perfekter Wassergehalt für Nährstoffaufnahme.";
+    if (hasSoilTemp) {
+        const soilTemp = hourly.soil_temperature_6cm[0];
+        soilTempValElement.textContent = `${soilTemp.toFixed(1)} °C`;
+        
+        if (soilTemp <= 0) {
+            tempStatus.textContent = "Bodenfrost";
+            tempStatus.classList.add('danger');
+            tempDesc.textContent = "Boden gefroren. Keine Keimung möglich.";
+        } else if (soilTemp < 8) {
+            tempStatus.textContent = "Kalt";
+            tempStatus.classList.add('warning');
+            tempDesc.textContent = "Zu kalt für die Keimung von Mais & Kartoffeln (< 8°C).";
+        } else if (soilTemp < 15) {
+            tempStatus.textContent = "Mäßig warm";
+            tempStatus.classList.add('info');
+            tempDesc.textContent = "Aussaat von Mais und Kartoffeln möglich.";
+        } else {
+            tempStatus.textContent = "Sehr gut";
+            tempStatus.classList.add('success');
+            tempDesc.textContent = "Optimale Keimbedingungen für wärmeliebende Kulturen.";
+        }
     } else {
-        moistStatus.textContent = "Nass";
-        moistStatus.classList.add('info');
-        moistDesc.textContent = "Boden stark wassergesättigt. Vorsicht bei Befahrung.";
+        soilTempValElement.textContent = "-- °C";
+        tempStatus.textContent = "Keine Daten";
+        tempStatus.classList.add('warning');
+        tempDesc.textContent = "Bodentemperatur für diesen Standort aktuell nicht verfügbar.";
+    }
+    
+    if (hasSoilMoist) {
+        const soilMoistureFraction = hourly.soil_moisture_3_to_9cm[0];
+        const soilMoistPercent = Math.round(soilMoistureFraction * 100);
+        soilMoistValElement.textContent = `${soilMoistPercent} %`;
+        soilMoistBarElement.style.width = `${soilMoistPercent}%`;
+        
+        if (soilMoistPercent < 15) {
+            moistStatus.textContent = "Trocken";
+            moistStatus.classList.add('danger');
+            moistDesc.textContent = "Kritischer Dürrebereich. Künstliche Bewässerung empfohlen.";
+        } else if (soilMoistPercent < 25) {
+            moistStatus.textContent = "Mäßig trocken";
+            moistStatus.classList.add('warning');
+            moistDesc.textContent = "Bodenfeuchte gering, Pflanzenwachstum verlangsamt.";
+        } else if (soilMoistPercent < 40) {
+            moistStatus.textContent = "Optimal";
+            moistStatus.classList.add('success');
+            moistDesc.textContent = "Perfekter Wassergehalt für Nährstoffaufnahme.";
+        } else {
+            moistStatus.textContent = "Nass";
+            moistStatus.classList.add('info');
+            moistDesc.textContent = "Boden stark wassergesättigt. Vorsicht bei Befahrung.";
+        }
+    } else {
+        soilMoistValElement.textContent = "-- %";
+        soilMoistBarElement.style.width = "0%";
+        moistStatus.textContent = "Keine Daten";
+        moistStatus.classList.add('warning');
+        moistDesc.textContent = "Bodenfeuchtigkeit für diesen Standort aktuell nicht verfügbar.";
     }
     
     const health = calculateAgroHealthIndices(hourly);
@@ -1227,17 +1315,4 @@ function calculateAgroHealthIndices(hourly) {
         scab: scabIndex,
         blight: blightIndex
     };
-}
-
-/**
- * Register Service Worker for PWA
- */
-function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./service-worker.js')
-                .then(reg => console.log('Service Worker registriert. Scope:', reg.scope))
-                .catch(err => console.error('Service Worker Registrierung fehlgeschlagen:', err));
-        });
-    }
 }
