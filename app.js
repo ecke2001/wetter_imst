@@ -25,6 +25,15 @@ const THEME_ORDER = ['auto', 'light', 'dark', 'contrast'];
 let themePreference = 'auto';
 
 /**
+ * Helper: Format a number for HTML templates. API/cache values are coerced so that
+ * nothing but digits can end up in innerHTML; null/missing values become "–".
+ */
+function fmt(value, digits = 0) {
+    const n = Number(value);
+    return value === null || value === undefined || !Number.isFinite(n) ? '–' : n.toFixed(digits);
+}
+
+/**
  * Helper: Render Lucide icons if the CDN script loaded (app must keep working without it)
  */
 function refreshIcons() {
@@ -123,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Unregister any active service worker and clear caches to ensure fresh data
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
+            for (const registration of registrations) {
                 registration.unregister().then(() => {
                     console.log('Service Worker successfully unregistered');
                 });
@@ -227,8 +236,8 @@ async function fetchWeatherData() {
         latitude: currentLat,
         longitude: currentLon,
         current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m',
-        hourly: 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,et0_fao_evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_0cm,soil_temperature_6cm,soil_moisture_3_to_9cm,weather_code',
-        daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration',
+        hourly: 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,et0_fao_evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_0cm,soil_temperature_6cm,soil_moisture_3_to_9cm',
+        daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration',
         timezone: 'Europe/Berlin',
         past_days: PAST_DAYS,
         forecast_days: FORECAST_DAYS
@@ -240,7 +249,7 @@ async function fetchWeatherData() {
     // Show loading state in UI
     const updateTimeEl = document.getElementById('updateTime');
     if (updateTimeEl) {
-        updateTimeEl.innerHTML = '<i data-lucide="loader-2" class="spin" style="display:inline-block; vertical-align:middle; margin-right:5px; width:14px; height:14px;"></i> Wetterdaten werden geladen...';
+        updateTimeEl.innerHTML = '<i data-lucide="loader-2" class="spin inline-spinner"></i> Wetterdaten werden geladen...';
         refreshIcons();
     }
     
@@ -368,7 +377,13 @@ function loadCache() {
  */
 function showCachedOrError() {
     const cached = loadCache();
-    if (cached && renderWeather(cached.data)) {
+    let rendered = false;
+    try {
+        rendered = cached !== null && renderWeather(cached.data);
+    } catch (e) {
+        console.error("Gespeicherte Wetterdaten sind unlesbar:", e);
+    }
+    if (rendered) {
         const saved = new Date(cached.savedAt);
         const isToday = saved.toDateString() === new Date().toDateString();
         const dayStr = isToday ? 'Heute' : saved.toLocaleDateString('de-AT', { weekday: 'short', day: '2-digit', month: '2-digit' });
@@ -448,12 +463,12 @@ function getWeatherIconName(code) {
  * Update the Current Weather Card
  */
 function updateCurrentWeather(current) {
-    document.getElementById('currentTemp').textContent = `${Math.round(current.temperature_2m)}°C`;
-    document.getElementById('feelsLike').textContent = `Gefühlt: ${Math.round(current.apparent_temperature)}°C`;
-    document.getElementById('currentHumidity').textContent = `${current.relative_humidity_2m}%`;
-    document.getElementById('currentWind').textContent = `${Math.round(current.wind_speed_10m)} (${Math.round(current.wind_gusts_10m)}) km/h`;
-    document.getElementById('currentPrecipitation').textContent = `${current.precipitation.toFixed(1)} mm`;
-    document.getElementById('currentPressure').textContent = `${Math.round(current.surface_pressure)} hPa`;
+    document.getElementById('currentTemp').textContent = `${fmt(current.temperature_2m)}°C`;
+    document.getElementById('feelsLike').textContent = `Gefühlt: ${fmt(current.apparent_temperature)}°C`;
+    document.getElementById('currentHumidity').textContent = `${fmt(current.relative_humidity_2m)}%`;
+    document.getElementById('currentWind').textContent = `${fmt(current.wind_speed_10m)} (${fmt(current.wind_gusts_10m)}) km/h`;
+    document.getElementById('currentPrecipitation').textContent = `${fmt(current.precipitation, 1)} mm`;
+    document.getElementById('currentPressure').textContent = `${fmt(current.surface_pressure)} hPa`;
     
     // Weather Desc & Icon
     const desc = getWeatherDesc(current.weather_code);
@@ -674,7 +689,6 @@ function sprayHourScore(hourly, h) {
  */
 function calculateGuelleIndex(dayIndex, daily) {
     const p = daily.precipitation_sum[dayIndex];
-    const prob = daily.precipitation_probability_max[dayIndex];
     const tMax = daily.temperature_2m_max[dayIndex];
     const wMax = daily.wind_speed_10m_max[dayIndex];
     const sunHours = (daily.sunshine_duration[dayIndex] || 0) / 3600;
@@ -801,8 +815,8 @@ function updateForecastUI(daily, hourly, nowIdx) {
         const iconName = getWeatherIconName(code);
         const desc = getWeatherDesc(code);
         
-        const tempMax = Math.round(daily.temperature_2m_max[i]);
-        const tempMin = Math.round(daily.temperature_2m_min[i]);
+        const tempMax = fmt(daily.temperature_2m_max[i]);
+        const tempMin = fmt(daily.temperature_2m_min[i]);
         
         const rainSum = daily.precipitation_sum[i];
         const rainProb = daily.precipitation_probability_max[i];
@@ -859,7 +873,7 @@ function updateForecastUI(daily, hourly, nowIdx) {
                 </div>
                 <div class="day-rain">
                     <i data-lucide="cloud-rain"></i>
-                    <span>${rainSum.toFixed(1)} mm (${rainProb}%)</span>
+                    <span>${fmt(rainSum, 1)} mm (${fmt(rainProb)}%)</span>
                 </div>
                 <div class="day-heu-badge-container">
                     <span class="heu-badge ${heuBadgeClass}">${heuBadgeText}</span>
@@ -931,13 +945,13 @@ function generateHourlyRowsForDay(dayIndex, dateStr, hourly) {
         if (hourInt === 6 || hourInt === 9 || hourInt === 12 || hourInt === 15 || hourInt === 18 || hourInt === 21) {
             const hourFormatted = timeObj.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
             
-            const temp = hourly.temperature_2m[h].toFixed(1);
-            const rain = hourly.precipitation[h].toFixed(1);
-            const prob = hourly.precipitation_probability[h];
-            const rh = hourly.relative_humidity_2m[h];
-            const wind = Math.round(hourly.wind_speed_10m[h]);
-            const gust = Math.round(hourly.wind_gusts_10m[h]);
-            const et = hourly.et0_fao_evapotranspiration[h] ? hourly.et0_fao_evapotranspiration[h].toFixed(2) : '0.00';
+            const temp = fmt(hourly.temperature_2m[h], 1);
+            const rain = fmt(hourly.precipitation[h], 1);
+            const prob = fmt(hourly.precipitation_probability[h]);
+            const rh = fmt(hourly.relative_humidity_2m[h]);
+            const wind = fmt(hourly.wind_speed_10m[h]);
+            const gust = fmt(hourly.wind_gusts_10m[h]);
+            const et = fmt(hourly.et0_fao_evapotranspiration[h] || 0, 2);
             
             rowsHtml += `
                 <tr>
@@ -1329,7 +1343,9 @@ function requestGPSLocation() {
     navigator.geolocation.getCurrentPosition(
         (position) => {
             gpsBtn.classList.remove('searching');
-            setLocation('gps', position.coords.latitude, position.coords.longitude);
+            // ~100 m precision is plenty for weather models; don't send exact positions to third parties
+            const round3 = v => Math.round(v * 1000) / 1000;
+            setLocation('gps', round3(position.coords.latitude), round3(position.coords.longitude));
         },
         (error) => {
             console.error("GPS Fehler:", error);
@@ -1808,7 +1824,7 @@ function calculateAgroHealthIndices(hourly, nowIdx) {
             if (wind < 10) wFactor = 1.0;
             else if (wind < 25) wFactor = 1.0 - ((wind - 10) / 15);
             
-            let rFactor = rain > 0 ? 0.0 : 1.0;
+            const rFactor = rain > 0 ? 0.0 : 1.0;
             
             beeSum += (tFactor * wFactor * rFactor * 100);
             beeCount++;

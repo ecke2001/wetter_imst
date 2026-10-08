@@ -12,18 +12,23 @@ pinned: false
 Eine hochperformante, mobile-optimierte Wetter-App für Landwirte im Raum Imst (Tirol), Österreich. Die App lädt Echtzeit-Wetterprognosen von Open-Meteo und berechnet spezifische landwirtschaftliche Kriterien.
 
 ## Features
+- **Heute am Hof:** Konkrete Empfehlungen – Spritzfenster mit Uhrzeit, nächster Mähtag, nächster Gülle-Tag sowie Warnungen vor Frost, Sturm, Starkregen und Gewitter.
 - **Agrar-Indizes:** Tägliche und stündliche Indizes für Heuwetter, Spritzwetter und Gülle-Wetter.
+- **14-Tage-Vorhersage:** Mit Heuwetter-Ampel und Begründung (z. B. „Regen So“).
 - **Heutrocknungs-Uhr:** Berechnet die Einfahrbereitschaft für Heu basierend auf der stündlichen Evapotranspiration (ET₀) und Regenunterbrechungen.
-- **Bodendaten:** Sensor-Messwerte für Bodentemperatur (Aussaat/Keimung) und Bodenfeuchte (Dürrewarnungen).
+- **Bodendaten:** Bodentemperatur (Aussaat/Keimung), Bodenfeuchte, Regen der letzten 7 Tage und Luft-/Bodenfrost der nächsten 48 Stunden.
 - **Pflanzengesundheit:** Spezifische Indikatoren für Bienenflug, Apfelschorf-Risiko und Kraut-/Knollenfäule-Risiko.
 - **Regenradar:** Integriertes interaktives Windy-Radar zentriert auf Imst (Ressourcenschonend per Lazy-Load).
 - **Diagramme:** Stündliche Trends (Temperatur/Taupunkt, Windböen, Regen) visualisiert mit Chart.js.
-- **Standort-Fallback:** Nutzt standardmäßig Imst, unterstützt aber auch dynamisches GPS oder die Auswahl von 8 Gemeinden im Bezirk.
+- **Standorte:** 8 Gemeinden im Bezirk, GPS-Ortung und eigene gespeicherte Felder („Meine Felder“) mit optionaler Höhenangabe für genauere Prognosen im Gebirge.
+- **Farbschema:** Automatisch, Hell, Dunkel oder Hoher Kontrast für direktes Sonnenlicht.
+- **Offline-Anzeige:** Die zuletzt geladenen Daten werden bei fehlender Verbindung angezeigt (ohne Service Worker, per `localStorage`).
 
 ## Architektur & Performance
 Diese App ist als statische Web-App (Vanilla JS/HTML/CSS) ohne Frameworks oder Build-Schritte umgesetzt.
 - **Keine Service Worker:** Voller Verzicht auf PWA-Caching zur Vermeidung von Lade-Konflikten.
 - **Performance:** Aggressives Resource-Hinting (`preconnect`, `dns-prefetch`), CDN-Pinning für Bibliotheken, optimierte DOM-Updates und O(1)-Vorhersagealgorithmen.
+- **Sicherheit:** Content-Security-Policy ohne Inline-Skripte/-Styles, Subresource-Integrity für CDN-Bibliotheken, GPS-Koordinaten werden auf ca. 100 m gerundet.
 
 ## Lokale Ausführung
 Starte einen Webserver im Stammverzeichnis:

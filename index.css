@@ -125,28 +125,6 @@
     --shadow-main: none;
 }
 
-:root[data-theme="contrast"] body {
-    background-image: none;
-    font-weight: 500;
-}
-
-:root[data-theme="contrast"] .card,
-:root[data-theme="contrast"] .app-header {
-    border-width: 2px;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-:root[data-theme="light"] .portal-badge,
-:root[data-theme="contrast"] .portal-badge {
-    color: var(--color-text-strong);
-}
-
-:root[data-theme="light"] .weather-icon-large svg,
-:root[data-theme="contrast"] .weather-icon-large svg {
-    filter: none;
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -156,8 +134,8 @@
 body {
     background-color: var(--bg-base);
     background-image: 
-        radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.05) 0, transparent 50%);
     background-attachment: fixed;
     color: var(--color-text-main);
     font-family: var(--font-body);
@@ -575,6 +553,18 @@ a:hover {
 .icon-heu { color: var(--color-success); }
 .icon-spritz { color: var(--color-info); }
 .icon-guelle { color: #d97706; }
+.icon-bee { color: #f59e0b; }
+.icon-scab { color: #ec4899; }
+.icon-blight { color: #ef4444; }
+
+/* Small spinner next to the "loading" status text */
+.inline-spinner {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 5px;
+    width: 14px;
+    height: 14px;
+}
 
 .index-value {
     font-family: var(--font-header);
@@ -592,6 +582,7 @@ a:hover {
 }
 
 .progress-bar {
+    width: 0;
     height: 100%;
     border-radius: 99px;
     transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -607,6 +598,18 @@ a:hover {
 
 .bg-guelle {
     background: linear-gradient(90deg, #b45309, #f59e0b);
+}
+
+.bg-bee {
+    background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+.bg-scab {
+    background: linear-gradient(90deg, #ec4899, #f43f5e);
+}
+
+.bg-blight {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
 }
 
 .index-footer {
@@ -1402,15 +1405,15 @@ a:hover {
     border-color: rgba(239, 68, 68, 0.2);
 }
 
-.drying-clock-container.warning-rain svg {
-    color: var(--color-danger);
-}
-
 .drying-clock-container svg {
     width: 20px;
     height: 20px;
     color: var(--color-primary);
     flex-shrink: 0;
+}
+
+.drying-clock-container.warning-rain svg {
+    color: var(--color-danger);
 }
 
 .drying-clock-text {
@@ -1447,17 +1450,23 @@ a:hover {
 }
 
 @media (max-width: 600px) {
+    /* Extra bottom padding leaves room for the fixed bottom tab bar */
     body {
         padding: 0.75rem;
+        padding-bottom: calc(5rem + env(safe-area-inset-bottom));
     }
     
     .app-header {
-        padding: 1rem 1rem 0 1rem;
+        padding: 1rem;
+        /* backdrop-filter would turn the header into the containing block of the fixed tab bar */
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
     
     .header-main {
         flex-direction: column;
         align-items: flex-start;
+        margin-bottom: 0;
     }
 
     .header-controls {
@@ -1494,21 +1503,6 @@ a:hover {
     }
     
     /* Bottom tab bar, reachable with the thumb */
-    body {
-        padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-    }
-    
-    .app-header {
-        padding-bottom: 1rem;
-        /* backdrop-filter would turn the header into the containing block of the fixed tab bar */
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-    }
-    
-    .header-main {
-        margin-bottom: 0;
-    }
-    
     .tab-navigation {
         position: fixed;
         left: 0;
@@ -1667,4 +1661,30 @@ a:hover {
     opacity: 0.55;
     pointer-events: none;
     transition: opacity 0.22s ease-in-out;
+}
+
+/* ==========================================================================
+   THEME OVERRIDES (after the base rules; tokens are defined at the top)
+   ========================================================================== */
+
+:root[data-theme="contrast"] body {
+    background-image: none;
+    font-weight: 500;
+}
+
+:root[data-theme="contrast"] .card,
+:root[data-theme="contrast"] .app-header {
+    border-width: 2px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-theme="light"] .portal-badge,
+:root[data-theme="contrast"] .portal-badge {
+    color: var(--color-text-strong);
+}
+
+:root[data-theme="light"] .weather-icon-large svg,
+:root[data-theme="contrast"] .weather-icon-large svg {
+    filter: none;
 }
