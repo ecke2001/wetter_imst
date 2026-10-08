@@ -16,6 +16,32 @@
     --color-text-main: #f3f4f6;
     --color-text-muted: #9ca3af;
     --color-text-dark: #1f2937;
+    --color-text-strong: #ffffff;
+    
+    /* Overlays & Tints (theme-dependent) */
+    --overlay-1: rgba(255, 255, 255, 0.02);
+    --overlay-2: rgba(255, 255, 255, 0.05);
+    --overlay-3: rgba(255, 255, 255, 0.08);
+    --inset-bg: rgba(0, 0, 0, 0.15);
+    
+    /* Semantic text colors (theme-dependent) */
+    --text-success: #34d399;
+    --text-warning: #fbbf24;
+    --text-danger: #fca5a5;
+    --text-rain: #60a5fa;
+    --text-cyan: #a5f3fc;
+    --text-slate: #cbd5e1;
+    --pill-success-text: #a7f3d0;
+    --pill-warning-text: #fde68a;
+    --pill-danger-text: #fecaca;
+    --pill-info-text: #cffafe;
+    
+    /* Chart.js colors (read from JS) */
+    --chart-text: #9ca3af;
+    --chart-grid: rgba(255, 255, 255, 0.05);
+    --chart-tooltip-bg: #1f2937;
+    
+    color-scheme: dark;
     
     /* Index States */
     --color-success: #10b981; /* Green: Go */
@@ -35,6 +61,90 @@
     /* Shadows */
     --shadow-main: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
     --shadow-inset: inset 0 2px 4px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Light theme (set via data-theme on <html>, resolved from "auto" in JS) */
+:root[data-theme="light"],
+:root[data-theme="contrast"] {
+    --bg-base: #f3f5f1;
+    --bg-surface: rgba(255, 255, 255, 0.92);
+    --bg-surface-hover: #ffffff;
+    --border-color: rgba(15, 23, 42, 0.12);
+    --border-color-hover: rgba(15, 23, 42, 0.25);
+    
+    --color-primary: #047857;
+    --color-primary-hover: #059669;
+    --color-text-main: #1f2937;
+    --color-text-muted: #4b5563;
+    --color-text-strong: #0f172a;
+    
+    --overlay-1: rgba(15, 23, 42, 0.025);
+    --overlay-2: rgba(15, 23, 42, 0.045);
+    --overlay-3: rgba(15, 23, 42, 0.07);
+    --inset-bg: rgba(15, 23, 42, 0.035);
+    
+    --text-success: #047857;
+    --text-warning: #b45309;
+    --text-danger: #b91c1c;
+    --text-rain: #1d4ed8;
+    --text-cyan: #0e7490;
+    --text-slate: #475569;
+    --pill-success-text: #065f46;
+    --pill-warning-text: #92400e;
+    --pill-danger-text: #991b1b;
+    --pill-info-text: #155e75;
+    
+    --chart-text: #4b5563;
+    --chart-grid: rgba(15, 23, 42, 0.08);
+    --chart-tooltip-bg: #1f2937;
+    
+    --shadow-main: 0 6px 20px -10px rgba(15, 23, 42, 0.25);
+    --shadow-inset: none;
+    
+    color-scheme: light;
+}
+
+/* High-contrast theme for bright sunlight on the field */
+:root[data-theme="contrast"] {
+    --bg-base: #ffffff;
+    --bg-surface: #ffffff;
+    --border-color: #1f2937;
+    --border-color-hover: #000000;
+    --color-primary: #065f46;
+    --color-text-main: #000000;
+    --color-text-muted: #1f2937;
+    --color-text-strong: #000000;
+    --text-success: #065f46;
+    --text-warning: #7c2d12;
+    --text-danger: #991b1b;
+    --text-rain: #1e3a8a;
+    --text-cyan: #164e63;
+    --text-slate: #1f2937;
+    --chart-text: #000000;
+    --chart-grid: rgba(0, 0, 0, 0.2);
+    --shadow-main: none;
+}
+
+:root[data-theme="contrast"] body {
+    background-image: none;
+    font-weight: 500;
+}
+
+:root[data-theme="contrast"] .card,
+:root[data-theme="contrast"] .app-header {
+    border-width: 2px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-theme="light"] .portal-badge,
+:root[data-theme="contrast"] .portal-badge {
+    color: var(--color-text-strong);
+}
+
+:root[data-theme="light"] .weather-icon-large svg,
+:root[data-theme="contrast"] .weather-icon-large svg {
+    filter: none;
 }
 
 * {
@@ -75,7 +185,7 @@ h1, h2, h3, h4 {
 h1 {
     font-size: 2rem;
     line-height: 1.1;
-    background: linear-gradient(135deg, #ffffff 40%, #10b981 100%);
+    background: linear-gradient(135deg, var(--color-text-strong) 40%, #10b981 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -86,7 +196,7 @@ h2 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #ffffff;
+    color: var(--color-text-strong);
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.5rem;
 }
@@ -156,13 +266,13 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-2);
     border: 1px solid var(--border-color);
     padding: 0.5rem 1rem;
     border-radius: 99px;
     font-size: 0.85rem;
     font-weight: 500;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 .location-badge i {
@@ -200,8 +310,8 @@ a:hover {
 }
 
 .tab-btn:hover {
-    color: #ffffff;
-    border-bottom-color: rgba(255, 255, 255, 0.2);
+    color: var(--color-text-strong);
+    border-bottom-color: var(--border-color-hover);
 }
 
 .tab-btn.active {
@@ -230,7 +340,7 @@ a:hover {
     gap: 0.75rem;
     margin-bottom: 1.5rem;
     padding: 0.5rem 1rem;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--overlay-1);
     border-radius: 8px;
     border: 1px solid var(--border-color);
     font-size: 0.85rem;
@@ -246,15 +356,23 @@ a:hover {
     gap: 0.5rem;
     background: rgba(239, 68, 68, 0.15);
     border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
+    color: var(--text-danger);
     padding: 0.25rem 0.75rem;
     border-radius: 99px;
     font-weight: 500;
 }
 
-.alert-pill i {
+.alert-pill i,
+.alert-pill svg {
     width: 14px;
     height: 14px;
+}
+
+/* Offline notice: showing cached data */
+.alert-pill.offline {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.4);
+    color: var(--text-warning);
 }
 
 /* 6. Dashboard Grid (Current Weather + Indices) */
@@ -282,7 +400,7 @@ a:hover {
     font-size: 3.5rem;
     font-family: var(--font-header);
     font-weight: 800;
-    color: #ffffff;
+    color: var(--color-text-strong);
     line-height: 1;
 }
 
@@ -311,14 +429,14 @@ a:hover {
 .weather-icon-large svg {
     width: 64px;
     height: 64px;
-    color: #ffffff;
+    color: var(--color-text-strong);
     filter: drop-shadow(0 4px 10px rgba(255, 255, 255, 0.2));
 }
 
 .weather-desc {
     font-size: 0.95rem;
     font-weight: 500;
-    color: #ffffff;
+    color: var(--color-text-strong);
     text-align: center;
 }
 
@@ -326,10 +444,10 @@ a:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    background: rgba(0, 0, 0, 0.15);
+    background: var(--inset-bg);
     padding: 1rem;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--overlay-1);
 }
 
 .detail-item {
@@ -353,7 +471,7 @@ a:hover {
 .detail-item span {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 /* Agricultural Indices Card */
@@ -371,7 +489,7 @@ a:hover {
 }
 
 .index-item-row {
-    background: rgba(0, 0, 0, 0.12);
+    background: var(--inset-bg);
     border: 1px solid var(--border-color);
     padding: 1rem;
     border-radius: 12px;
@@ -390,7 +508,7 @@ a:hover {
     gap: 0.5rem;
     font-weight: 600;
     font-size: 0.95rem;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 .index-title-area svg {
@@ -411,7 +529,7 @@ a:hover {
 .progress-bar-container {
     width: 100%;
     height: 8px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-2);
     border-radius: 99px;
     overflow: hidden;
     margin-bottom: 0.5rem;
@@ -449,14 +567,14 @@ a:hover {
     font-weight: 600;
     text-transform: uppercase;
     font-size: 0.7rem;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 /* Status Pill States */
-.status-pill.success { background-color: rgba(16, 185, 129, 0.25); border: 1px solid var(--color-success); color: #a7f3d0; }
-.status-pill.warning { background-color: rgba(245, 158, 11, 0.25); border: 1px solid var(--color-warning); color: #fde68a; }
-.status-pill.danger { background-color: rgba(239, 104, 104, 0.25); border: 1px solid var(--color-danger); color: #fecaca; }
-.status-pill.info { background-color: rgba(6, 182, 212, 0.25); border: 1px solid var(--color-info); color: #cffafe; }
+.status-pill.success { background-color: rgba(16, 185, 129, 0.25); border: 1px solid var(--color-success); color: var(--pill-success-text); }
+.status-pill.warning { background-color: rgba(245, 158, 11, 0.25); border: 1px solid var(--color-warning); color: var(--pill-warning-text); }
+.status-pill.danger { background-color: rgba(239, 104, 104, 0.25); border: 1px solid var(--color-danger); color: var(--pill-danger-text); }
+.status-pill.info { background-color: rgba(6, 182, 212, 0.25); border: 1px solid var(--color-info); color: var(--pill-info-text); }
 
 .index-desc {
     color: var(--color-text-muted);
@@ -506,7 +624,7 @@ a:hover {
 }
 
 .forecast-day-row {
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--overlay-1);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     overflow: hidden;
@@ -515,7 +633,7 @@ a:hover {
 
 .forecast-day-row:hover {
     border-color: var(--border-color-hover);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--overlay-2);
 }
 
 .forecast-day-summary {
@@ -537,7 +655,7 @@ a:hover {
 
 .day-name {
     font-weight: 600;
-    color: #ffffff;
+    color: var(--color-text-strong);
     font-size: 1rem;
 }
 
@@ -556,7 +674,7 @@ a:hover {
 .day-icon svg {
     width: 30px;
     height: 30px;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 .day-desc {
@@ -573,7 +691,7 @@ a:hover {
 }
 
 .temp-max {
-    color: #ffffff;
+    color: var(--color-text-strong);
     font-weight: 600;
 }
 
@@ -586,7 +704,7 @@ a:hover {
     align-items: center;
     gap: 0.4rem;
     font-size: 0.85rem;
-    color: #60a5fa;
+    color: var(--text-rain);
     min-width: 90px;
 }
 
@@ -609,9 +727,9 @@ a:hover {
     text-align: center;
 }
 
-.heu-badge.go { background-color: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-success); color: #34d399; }
-.heu-badge.caution { background-color: rgba(245, 158, 11, 0.15); border: 1px solid var(--color-warning); color: #fbbf24; }
-.heu-badge.stop { background-color: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); color: #fca5a5; }
+.heu-badge.go { background-color: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-success); color: var(--text-success); }
+.heu-badge.caution { background-color: rgba(245, 158, 11, 0.15); border: 1px solid var(--color-warning); color: var(--text-warning); }
+.heu-badge.stop { background-color: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-danger); color: var(--text-danger); }
 
 .row-toggle-icon {
     transition: transform var(--transition-normal);
@@ -625,7 +743,7 @@ a:hover {
 
 .forecast-day-row.expanded .row-toggle-icon {
     transform: rotate(180deg);
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 /* Accordion Hourly Details */
@@ -633,12 +751,11 @@ a:hover {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.4s ease-out;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--inset-bg);
     border-top: 1px solid transparent;
 }
 
 .forecast-day-row.expanded .day-hourly-details {
-    max-height: 500px;
     border-top: 1px solid var(--border-color);
 }
 
@@ -657,7 +774,7 @@ a:hover {
 
 .hourly-table th, .hourly-table td {
     padding: 0.6rem 0.75rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--overlay-1);
 }
 
 .hourly-table th {
@@ -665,37 +782,37 @@ a:hover {
     font-weight: 600;
     font-size: 0.75rem;
     text-transform: uppercase;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--overlay-1);
 }
 
 .hourly-table tr:hover td {
-    background: rgba(255, 255, 255, 0.01);
+    background: var(--overlay-1);
 }
 
 .hourly-time {
     font-weight: 600;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 .hourly-temp {
-    color: #ffffff;
+    color: var(--color-text-strong);
     font-weight: 500;
 }
 
 .hourly-rain {
-    color: #60a5fa;
+    color: var(--text-rain);
 }
 
 .hourly-humidity {
-    color: #a5f3fc;
+    color: var(--text-cyan);
 }
 
 .hourly-wind {
-    color: #cbd5e1;
+    color: var(--text-slate);
 }
 
 .hourly-et {
-    color: #fca5a5;
+    color: var(--text-danger);
     font-weight: 500;
 }
 
@@ -773,7 +890,7 @@ a:hover {
     overflow: hidden;
     border: 1px solid var(--border-color);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    background: #1a1e29;
+    background: var(--bg-base);
 }
 
 .radar-iframe-wrapper iframe {
@@ -790,7 +907,7 @@ a:hover {
 
 .radar-quick-links h3 {
     font-size: 0.95rem;
-    color: #ffffff;
+    color: var(--color-text-strong);
     margin-bottom: 0.75rem;
 }
 
@@ -804,7 +921,7 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--overlay-1);
     border: 1px solid var(--border-color);
     padding: 0.75rem 1rem;
     border-radius: 8px;
@@ -821,8 +938,8 @@ a:hover {
 }
 
 .mini-link-card:hover {
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text-strong);
+    background: var(--overlay-2);
     border-color: var(--border-color-hover);
     transform: translateY(-2px);
 }
@@ -833,7 +950,7 @@ a:hover {
     align-items: flex-start;
     gap: 1.25rem;
     margin-bottom: 1.5rem;
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(17, 24, 39, 0.75) 100%);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, var(--bg-surface) 100%);
     border-color: rgba(16, 185, 129, 0.2);
 }
 
@@ -886,7 +1003,7 @@ a:hover {
 }
 
 .portal-badge.geosphere { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid #3b82f6; }
-.portal-badge.lk { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; }
+.portal-badge.lk { background: rgba(16, 185, 129, 0.15); color: var(--text-success); border: 1px solid #10b981; }
 .portal-badge.models { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid #8b5cf6; }
 .portal-badge.hydro { background: rgba(6, 182, 212, 0.15); color: #67e8f9; border: 1px solid #06b6d4; }
 .portal-badge.bergfex { background: rgba(236, 72, 153, 0.15); color: #f9a8d4; border: 1px solid #ec4899; }
@@ -894,7 +1011,7 @@ a:hover {
 
 .portal-card h3 {
     font-size: 1.1rem;
-    color: #ffffff;
+    color: var(--color-text-strong);
     margin-right: 5.5rem; /* Make room for badge */
 }
 
@@ -912,7 +1029,7 @@ a:hover {
     font-weight: 600;
     font-size: 0.9rem;
     margin-top: 1.25rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--overlay-2);
     padding-top: 0.75rem;
     width: 100%;
 }
@@ -957,9 +1074,9 @@ a:hover {
 #locationSelect {
     appearance: none;
     -webkit-appearance: none;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-2);
     border: 1px solid var(--border-color);
-    color: #ffffff;
+    color: var(--color-text-strong);
     border-radius: 99px;
     padding: 0.5rem 2.25rem 0.5rem 2.25rem;
     font-size: 0.85rem;
@@ -971,8 +1088,8 @@ a:hover {
 }
 
 #locationSelect:hover, #locationSelect:focus {
-    border-color: rgba(255, 255, 255, 0.25);
-    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-color-hover);
+    background: var(--overlay-3);
 }
 
 .select-icon {
@@ -994,7 +1111,7 @@ a:hover {
     transform: translateY(-50%);
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
-    border-top: 5px solid #ffffff;
+    border-top: 5px solid var(--color-text-strong);
     pointer-events: none;
     opacity: 0.6;
 }
@@ -1019,7 +1136,7 @@ a:hover {
 .gps-btn:hover {
     background: rgba(16, 185, 129, 0.18);
     border-color: var(--color-primary);
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 .gps-btn svg {
@@ -1031,7 +1148,12 @@ a:hover {
     animation: gps-pulse-anim 1.5s infinite ease-in-out;
     background: rgba(6, 182, 212, 0.15);
     border-color: var(--color-info);
-    color: #cffafe;
+    color: var(--pill-info-text);
+}
+
+/* Theme toggle (icon-only variant of the GPS pill) */
+.theme-btn {
+    padding: 0.5rem 0.7rem;
 }
 
 @keyframes gps-pulse-anim {
@@ -1042,7 +1164,7 @@ a:hover {
 
 /* 13. Bodendaten (Agro Tab) */
 .agro-metric-row {
-    background: rgba(0, 0, 0, 0.12);
+    background: var(--inset-bg);
     border: 1px solid var(--border-color);
     padding: 1rem;
     border-radius: 12px;
@@ -1062,7 +1184,7 @@ a:hover {
     gap: 0.5rem;
     font-weight: 600;
     font-size: 0.95rem;
-    color: #ffffff;
+    color: var(--color-text-strong);
 }
 
 .metric-label svg {
@@ -1113,7 +1235,7 @@ a:hover {
 
 .drying-clock-title {
     font-weight: 600;
-    color: #ffffff;
+    color: var(--color-text-strong);
     margin-right: 0.25rem;
 }
 
@@ -1123,7 +1245,7 @@ a:hover {
 }
 
 .drying-clock-container.warning-rain .drying-clock-time {
-    color: #fca5a5;
+    color: var(--text-danger);
 }
 
 /* ==========================================================================
@@ -1261,6 +1383,16 @@ a:hover {
     .radar-iframe-wrapper {
         height: 350px;
     }
+}
+
+/* Shown when Chart.js could not be loaded from the CDN */
+.chart-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
 }
 
 /* Loading fade effect for smooth UI refresh */

@@ -17,6 +17,15 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
     <!-- CSS Stylesheet -->
     <link rel="stylesheet" href="index.css">
+    <!-- Apply saved color theme before first paint (full logic in app.js) -->
+    <script>
+        (function () {
+            var pref = 'auto';
+            try { pref = localStorage.getItem('agrarwetter_theme') || 'auto'; } catch (e) {}
+            if (pref === 'auto') pref = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', pref);
+        })();
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -46,6 +55,9 @@
                     </div>
                     <button class="gps-btn" id="gpsBtn" onclick="requestGPSLocation()" title="Aktuellen Standort über GPS ermitteln">
                         <i data-lucide="locate"></i> <span>GPS</span>
+                    </button>
+                    <button class="gps-btn theme-btn" id="themeBtn" onclick="cycleTheme()" title="Farbschema wechseln" aria-label="Farbschema wechseln">
+                        <i data-lucide="sun-moon"></i>
                     </button>
                 </div>
             </div>

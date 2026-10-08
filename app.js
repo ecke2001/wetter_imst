@@ -5,8 +5,29 @@
 
 // Global state
 let weatherData = null;
+let currentHourIdx = 0; // index into weatherData.hourly for the current hour
 let tempChartInstance = null;
 let precipWindChartInstance = null;
+
+const CACHE_KEY = 'agrarwetter_cache';
+const THEME_KEY = 'agrarwetter_theme';
+
+// Theme preference cycle; "auto" follows the device setting
+const THEMES = {
+    auto: { icon: 'sun-moon', label: 'Automatisch (Gerät)' },
+    light: { icon: 'sun', label: 'Hell' },
+    dark: { icon: 'moon', label: 'Dunkel' },
+    contrast: { icon: 'contrast', label: 'Hoher Kontrast (Sonnenlicht)' }
+};
+const THEME_ORDER = ['auto', 'light', 'dark', 'contrast'];
+let themePreference = 'auto';
+
+/**
+ * Helper: Render Lucide icons if the CDN script loaded (app must keep working without it)
+ */
+function refreshIcons() {
+    if (window.lucide) lucide.createIcons();
+}
 
 // Presets for locations in District Imst
 const LOCATIONS = {
@@ -40,10 +61,48 @@ function findNearestLocation(lat, lon) {
     return nearestKey;
 }
 
+/**
+ * Theme handling (pre-applied by the inline script in index.html to avoid a flash)
+ */
+function resolveTheme(pref) {
+    if (pref !== 'auto') return pref;
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme(pref) {
+    themePreference = THEMES[pref] ? pref : 'auto';
+    document.documentElement.setAttribute('data-theme', resolveTheme(themePreference));
+
+    const btn = document.getElementById('themeBtn');
+    if (btn) {
+        const theme = THEMES[themePreference];
+        btn.innerHTML = `<i data-lucide="${theme.icon}"></i>`;
+        btn.title = `Farbschema: ${theme.label}`;
+        refreshIcons();
+    }
+
+    // Charts read their colors from CSS variables, so redraw them
+    if (weatherData) renderCharts(weatherData.hourly, currentHourIdx);
+}
+
+function cycleTheme() {
+    const next = THEME_ORDER[(THEME_ORDER.indexOf(themePreference) + 1) % THEME_ORDER.length];
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* storage unavailable */ }
+    applyTheme(next);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Theme: restore preference and follow device changes while on "auto"
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem(THEME_KEY); } catch (e) { /* storage unavailable */ }
+    applyTheme(savedTheme || 'auto');
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+        if (themePreference === 'auto') applyTheme('auto');
+    });
+
     // Initialize Lucide Icons
-    lucide.createIcons();
-    
+    refreshIcons();
+
     // Restore location from localStorage
     const savedLoc = localStorage.getItem('agrarwetter_loc');
     const savedLat = localStorage.getItem('agrarwetter_lat');
@@ -157,7 +216,7 @@ async function fetchWeatherData() {
     const updateTimeEl = document.getElementById('updateTime');
     if (updateTimeEl) {
         updateTimeEl.innerHTML = '<i data-lucide="loader-2" class="spin" style="display:inline-block; vertical-align:middle; margin-right:5px; width:14px; height:14px;"></i> Wetterdaten werden geladen...';
-        lucide.createIcons();
+        refreshIcons();
     }
     
     const appContent = document.querySelector('.app-content');
@@ -165,49 +224,139 @@ async function fetchWeatherData() {
         appContent.classList.add('loading-fade');
     }
     
+    let data;
     try {
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP-Fehler! Status: ${response.status}`);
         }
-        weatherData = await response.json();
-        
-        // Update UI components
-        updateCurrentWeather(weatherData.current);
-        
-        const indices = calculateAllIndices(weatherData.daily, weatherData.hourly);
-        updateIndicesUI(indices);
-        
-        updateForecastUI(weatherData.daily, weatherData.hourly);
-        
-        updateSoilHealthUI(weatherData.hourly);
-        
-        renderCharts(weatherData.hourly);
-        
-        // Re-initialize all Lucide icons once after all DOM updates
-        lucide.createIcons();
-        
-        // Update Timestamp
-        const now = new Date();
-        document.getElementById('updateTime').textContent = `Stand: Heute, ${now.toLocaleTimeString('de-AT', {hour: '2-digit', minute:'2-digit'})} Uhr`;
-        
+        data = await response.json();
     } catch (error) {
         console.error("Fehler beim Abrufen der Wetterdaten:", error);
-        document.getElementById('updateTime').textContent = "Fehler beim Laden der Live-Daten.";
-        
-        // Show offline fallback alert
-        const alertPill = document.getElementById('activeAlert');
-        const alertText = document.getElementById('alertText');
-        alertPill.classList.remove('hide');
-        alertPill.style.background = 'rgba(239, 68, 68, 0.2)';
-        alertPill.style.borderColor = '#ef4444';
-        alertText.textContent = "Verbindungsfehler. Bitte Internetverbindung prüfen.";
-        alertText.style.color = '#fecaca';
+        showCachedOrError();
+        return;
     } finally {
         if (appContent) {
             appContent.classList.remove('loading-fade');
         }
     }
+    
+    saveCache(data);
+    renderWeather(data);
+    
+    const now = new Date();
+    document.getElementById('updateTime').textContent = `Stand: Heute, ${now.toLocaleTimeString('de-AT', {hour: '2-digit', minute:'2-digit'})} Uhr`;
+}
+
+/**
+ * Render a full Open-Meteo response. Past days are dropped first so that
+ * day 0 is always today, also for older cached data.
+ * Returns false if the data no longer covers the current hour.
+ */
+function renderWeather(data) {
+    const nowIdx = getCurrentHourIndex(data);
+    const pastDays = Math.floor(nowIdx / 24);
+    if (pastDays >= data.daily.time.length) return false;
+    if (pastDays > 0) dropPastDays(data, pastDays);
+    
+    weatherData = data;
+    currentHourIdx = nowIdx - pastDays * 24;
+    
+    updateCurrentWeather(data.current);
+    
+    const indices = calculateAllIndices(data.daily, data.hourly, currentHourIdx);
+    updateIndicesUI(indices);
+    
+    updateForecastUI(data.daily, data.hourly, currentHourIdx);
+    
+    updateSoilHealthUI(data.hourly, currentHourIdx);
+    
+    renderCharts(data.hourly, currentHourIdx);
+    
+    // Re-initialize all Lucide icons once after all DOM updates
+    refreshIcons();
+    return true;
+}
+
+/**
+ * Index of the current hour in hourly.time. The hourly arrays always start at
+ * 00:00 of the first forecast day, so index 0 is NOT "now".
+ * Uses the API's UTC offset so it works regardless of the device time zone.
+ */
+function getCurrentHourIndex(data) {
+    const offsetSec = data.utc_offset_seconds ?? -new Date().getTimezoneOffset() * 60;
+    const local = new Date(Date.now() + offsetSec * 1000);
+    const pad = n => String(n).padStart(2, '0');
+    const nowStr = `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}T${pad(local.getUTCHours())}:00`;
+    
+    const times = data.hourly.time;
+    // Data ends before today: point past the end so the caller can reject it
+    if (nowStr.slice(0, 10) > times[times.length - 1].slice(0, 10)) return times.length;
+
+    let idx = 0;
+    // ISO strings in the same zone compare correctly as plain strings
+    while (idx + 1 < times.length && times[idx + 1] <= nowStr) idx++;
+    return idx;
+}
+
+/**
+ * Remove the first n days from daily and n*24 hours from hourly (in place)
+ */
+function dropPastDays(data, n) {
+    for (const key of Object.keys(data.daily)) {
+        if (Array.isArray(data.daily[key])) data.daily[key] = data.daily[key].slice(n);
+    }
+    for (const key of Object.keys(data.hourly)) {
+        if (Array.isArray(data.hourly[key])) data.hourly[key] = data.hourly[key].slice(n * 24);
+    }
+}
+
+/**
+ * Offline cache: keep the last successful response in localStorage
+ */
+function saveCache(data) {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), lat: currentLat, lon: currentLon, data }));
+    } catch (e) {
+        console.warn("Wetterdaten konnten nicht offline gespeichert werden:", e);
+    }
+}
+
+function loadCache() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+        if (cached && cached.lat === currentLat && cached.lon === currentLon && cached.data) return cached;
+    } catch (e) { /* storage unavailable or corrupt */ }
+    return null;
+}
+
+/**
+ * Network failed: fall back to cached data for this location, else show an error
+ */
+function showCachedOrError() {
+    const cached = loadCache();
+    if (cached && renderWeather(cached.data)) {
+        const saved = new Date(cached.savedAt);
+        const isToday = saved.toDateString() === new Date().toDateString();
+        const dayStr = isToday ? 'Heute' : saved.toLocaleDateString('de-AT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        const timeStr = saved.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('updateTime').textContent = `Offline – Stand: ${dayStr}, ${timeStr} Uhr`;
+        setStatusAlert("Keine Verbindung – gespeicherte Daten werden angezeigt.", 'offline');
+        return;
+    }
+    
+    document.getElementById('updateTime').textContent = "Fehler beim Laden der Live-Daten.";
+    setStatusAlert("Verbindungsfehler. Bitte Internetverbindung prüfen.", 'danger');
+}
+
+/**
+ * Show/hide the alert pill in the status bar. variant: 'danger' | 'offline' | null (hide)
+ */
+function setStatusAlert(text, variant) {
+    const alertPill = document.getElementById('activeAlert');
+    alertPill.classList.toggle('hide', !variant);
+    alertPill.classList.toggle('offline', variant === 'offline');
+    if (text) document.getElementById('alertText').textContent = text;
 }
 
 /**
@@ -255,8 +404,8 @@ function getWeatherIconName(code) {
     if (code === 1 || code === 2) return 'cloud-sun';
     if (code === 3) return 'cloud';
     if (code === 45 || code === 48) return 'cloud-fog';
-    if ([51, 53, 55, 80, 81, 82].includes(code)) return 'cloud-drizzle';
-    if ([61, 63, 65].includes(code)) return 'cloud-rain';
+    if ([51, 53, 55, 56, 57, 80, 81, 82].includes(code)) return 'cloud-drizzle';
+    if ([61, 63, 65, 66, 67].includes(code)) return 'cloud-rain';
     if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snowflake';
     if ([95, 96, 99].includes(code)) return 'cloud-lightning';
     return 'cloud';
@@ -282,31 +431,24 @@ function updateCurrentWeather(current) {
     iconContainer.innerHTML = `<i data-lucide="${iconName}"></i>`;
     
     // Check for alerts
-    const alertPill = document.getElementById('activeAlert');
-    const alertText = document.getElementById('alertText');
-    
     if (current.wind_gusts_10m > 50) {
-        alertPill.classList.remove('hide');
-        alertText.textContent = `Starkwindböen (${Math.round(current.wind_gusts_10m)} km/h)!`;
+        setStatusAlert(`Starkwindböen (${Math.round(current.wind_gusts_10m)} km/h)!`, 'danger');
     } else if (current.precipitation > 5) {
-        alertPill.classList.remove('hide');
-        alertText.textContent = "Starker Niederschlag aktuell!";
+        setStatusAlert("Starker Niederschlag aktuell!", 'danger');
     } else {
-        alertPill.classList.add('hide');
+        setStatusAlert(null, null);
     }
-    
-
 }
 
 /**
  * Calculate All Agricultural Indices
  */
-function calculateAllIndices(daily, hourly) {
+function calculateAllIndices(daily, hourly, nowIdx) {
     // 1. Calculate Heuwetter-Index for today (Day 0)
     const heuIndex = calculateHeuIndex(0, daily);
     
-    // 2. Calculate Spritzwetter-Index for current window (next 12 hours)
-    const spritzIndex = calculateSpritzIndex(hourly);
+    // 2. Calculate Spritzwetter-Index for current window (next 12 hours from now)
+    const spritzIndex = calculateSpritzIndex(hourly, nowIdx);
     
     // 3. Calculate Gülle-Wetter-Index for today (Day 0)
     const guelleIndex = calculateGuelleIndex(0, daily);
@@ -319,18 +461,53 @@ function calculateAllIndices(daily, hourly) {
 }
 
 /**
+ * Heuwetter rain score for a single day (0 = rain halts hay drying)
+ */
+function heuRainScore(idx, daily) {
+    const p = daily.precipitation_sum[idx];
+    const prob = daily.precipitation_probability_max[idx];
+    
+    let rDay = 100;
+    if (p >= 1.0) {
+        // Rain of 1mm or more completely halts hay drying
+        rDay = 0;
+    } else if (p > 0) {
+        rDay -= p * 80; // heavy penalty for light rain
+    }
+    
+    if (prob >= 35) {
+        rDay = 0; // High probability of rain prevents mowing safely
+    } else if (prob > 15) {
+        rDay -= (prob - 15) * 4;
+    }
+    return Math.max(0, rDay);
+}
+
+/**
+ * Size of the Heuwetter window starting at startDateIndex (3 days, shorter at the forecast end)
+ */
+function heuWindowSize(startDateIndex, daily) {
+    return Math.min(3, daily.precipitation_sum.length - startDateIndex);
+}
+
+/**
+ * First day in the Heuwetter window whose rain score is 0, or -1
+ */
+function findHeuRainDay(startDateIndex, daily) {
+    const windowSize = heuWindowSize(startDateIndex, daily);
+    for (let k = 0; k < windowSize; k++) {
+        if (heuRainScore(startDateIndex + k, daily) === 0) return startDateIndex + k;
+    }
+    return -1;
+}
+
+/**
  * Heuwetter-Index Algorithm (rolling window)
  * Evaluates drying conditions over 3 consecutive days starting on startDateIndex
  */
 function calculateHeuIndex(startDateIndex, daily) {
-    const numDaysForecast = daily.precipitation_sum.length;
-    
-    // Adjust window size for days close to forecast limit
-    let windowSize = 3;
-    if (startDateIndex + 2 >= numDaysForecast) {
-        windowSize = numDaysForecast - startDateIndex; // 2 or 1 day window
-    }
-    
+    // Window shrinks to 2 or 1 days close to the forecast limit
+    const windowSize = heuWindowSize(startDateIndex, daily);
     if (windowSize <= 0) return 0;
     
     let rainScoreTotal = 100;
@@ -342,28 +519,13 @@ function calculateHeuIndex(startDateIndex, daily) {
     for (let k = 0; k < windowSize; k++) {
         const idx = startDateIndex + k;
         
-        const p = daily.precipitation_sum[idx];
-        const prob = daily.precipitation_probability_max[idx];
         const et = daily.et0_fao_evapotranspiration[idx] || 0.0;
         const sun = (daily.sunshine_duration[idx] || 0) / 3600;
         const tMax = daily.temperature_2m_max[idx];
         const wMax = daily.wind_speed_10m_max[idx];
         
         // 1. Rain Penalty per day
-        let rDay = 100;
-        if (p >= 1.0) {
-            // Rain of 1mm or more completely halts hay drying
-            rDay = 0;
-        } else if (p > 0) {
-            rDay -= p * 80; // heavy penalty for light rain
-        }
-        
-        if (prob >= 35) {
-            rDay = 0; // High probability of rain prevents mowing safely
-        } else if (prob > 15) {
-            rDay -= (prob - 15) * 4;
-        }
-        rDay = Math.max(0, rDay);
+        const rDay = heuRainScore(idx, daily);
         
         // RainScore is limited by the worst day in the window
         rainScoreTotal = Math.min(rainScoreTotal, rDay);
@@ -422,14 +584,14 @@ function calculateHeuIndex(startDateIndex, daily) {
  * Spritzwetter-Index Algorithm (Pflanzenschutz)
  * Evaluates current day working hours (next 12 hourly forecast hours)
  */
-function calculateSpritzIndex(hourly) {
+function calculateSpritzIndex(hourly, nowIdx) {
     let scoresSum = 0;
     let count = 0;
     
-    // Look at next 12 hours
-    const limit = Math.min(12, hourly.temperature_2m.length);
+    // Look at next 12 hours from now
+    const limit = Math.min(nowIdx + 12, hourly.temperature_2m.length);
     
-    for (let h = 0; h < limit; h++) {
+    for (let h = nowIdx; h < limit; h++) {
         const temp = hourly.temperature_2m[h];
         const wind = hourly.wind_speed_10m[h];
         const gust = hourly.wind_gusts_10m[h];
@@ -582,7 +744,7 @@ function updateIndicesUI(indices) {
 /**
  * Render the 7-day Forecast List with Expandable Accordions
  */
-function updateForecastUI(daily, hourly) {
+function updateForecastUI(daily, hourly, nowIdx) {
     const listContainer = document.getElementById('forecastList');
     listContainer.innerHTML = ''; // Clear loading spinner
     
@@ -590,7 +752,7 @@ function updateForecastUI(daily, hourly) {
     
     for (let i = 0; i < daily.time.length; i++) {
         const dateStr = daily.time[i];
-        const dateObj = new Date(dateStr);
+        const dateObj = new Date(`${dateStr}T00:00`); // local midnight, not UTC
         
         let weekday = daysOfWeek[dateObj.getDay()];
         if (i === 0) weekday = "Heute";
@@ -613,19 +775,28 @@ function updateForecastUI(daily, hourly) {
         
         // Determine Heuwetter badge
         let heuBadgeClass = 'stop';
-        let heuBadgeText = 'Heuen: Rot';
+        let heuBadgeText;
         if (heuIdx >= 70) {
             heuBadgeClass = 'go';
             heuBadgeText = `Heuen: Sehr gut (${heuIdx}%)`;
         } else if (heuIdx >= 40) {
             heuBadgeClass = 'caution';
             heuBadgeText = `Heuen: Mäßig (${heuIdx}%)`;
+        } else if (heuIdx > 0) {
+            heuBadgeText = `Heuen: Riskant (${heuIdx}%)`;
         } else {
-            heuBadgeText = heuIdx > 0 ? `Heuen: Riskant (${heuIdx}%)` : 'Heuen: Nein (0%)';
+            // Explain a "Nein" on a dry day: rain later within the 3-day drying window
+            const rainDay = findHeuRainDay(i, daily);
+            if (rainDay > i) {
+                const rainWeekday = new Date(`${daily.time[rainDay]}T00:00`).toLocaleDateString('de-AT', { weekday: 'short' });
+                heuBadgeText = `Heuen: Nein (Regen ${rainWeekday})`;
+            } else {
+                heuBadgeText = 'Heuen: Nein (Regen)';
+            }
         }
         
         // Simulate Hay-Drying Clock (ET0 and Rain hours)
-        const dryingInfo = simulateHayDrying(i, daily, hourly);
+        const dryingInfo = simulateHayDrying(i, daily, hourly, nowIdx);
         
         // Generate Hourly Table Content for this day
         const hourlyRowsHtml = generateHourlyRowsForDay(i, dateStr, hourly);
@@ -759,17 +930,25 @@ function toggleForecastAccordion(dayIndex) {
         
         // Expand this one
         row.classList.add('expanded');
-        // Let's set a maximum height large enough for the contents
-        detailPanel.style.maxHeight = '500px';
+        // Animate to the real content height (fixed values clip the table on phones)
+        detailPanel.style.maxHeight = `${detailPanel.scrollHeight}px`;
     }
 }
 
 /**
  * Render Trend Charts (Chart.js)
  */
-function renderCharts(hourly) {
-    // Extract next 48 hours for high-res trend charts
-    const limit = 48;
+function renderCharts(hourly, nowIdx) {
+    // Chart.js comes from a CDN; keep the rest of the app working without it
+    if (typeof Chart === 'undefined') {
+        document.querySelectorAll('.chart-container').forEach(container => {
+            container.innerHTML = '<p class="chart-fallback">Diagramme konnten nicht geladen werden.</p>';
+        });
+        return;
+    }
+    
+    // Extract next 48 hours from now for high-res trend charts
+    const end = Math.min(nowIdx + 48, hourly.time.length);
     const labels = [];
     const temps = [];
     const dewPoints = [];
@@ -779,7 +958,7 @@ function renderCharts(hourly) {
     
     const daysOfWeekShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
     
-    for (let h = 0; h < limit; h++) {
+    for (let h = nowIdx; h < end; h++) {
         const timeObj = new Date(hourly.time[h]);
         const weekday = daysOfWeekShort[timeObj.getDay()];
         const hour = timeObj.getHours();
@@ -797,10 +976,13 @@ function renderCharts(hourly) {
     if (tempChartInstance) tempChartInstance.destroy();
     if (precipWindChartInstance) precipWindChartInstance.destroy();
     
-    // Chart.js Default styling overrides for dark mode
-    Chart.defaults.color = '#9ca3af';
-    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+    // Chart.js styling from the active theme's CSS variables
+    const css = getComputedStyle(document.documentElement);
+    const cssVar = name => css.getPropertyValue(name).trim();
+    Chart.defaults.color = cssVar('--chart-text');
+    Chart.defaults.borderColor = cssVar('--chart-grid');
     Chart.defaults.font.family = 'Inter';
+    const tooltipBg = cssVar('--chart-tooltip-bg');
     
     // 1. Temperature & Dew Point Chart
     const ctxTemp = document.getElementById('tempChart').getContext('2d');
@@ -843,7 +1025,7 @@ function renderCharts(hourly) {
                 tooltip: {
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: '#1f2937',
+                    backgroundColor: tooltipBg,
                     titleColor: '#ffffff',
                     bodyColor: '#e5e7eb',
                     borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -916,7 +1098,7 @@ function renderCharts(hourly) {
                 tooltip: {
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: '#1f2937',
+                    backgroundColor: tooltipBg,
                     titleColor: '#ffffff',
                     bodyColor: '#e5e7eb',
                     borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -1037,12 +1219,13 @@ function requestGPSLocation() {
 /**
  * Simulate Hay Drying using hourly ET0 and rain hours
  */
-function simulateHayDrying(dayIndex, daily, hourly) {
+function simulateHayDrying(dayIndex, daily, hourly, nowIdx) {
     const rainProb = daily.precipitation_probability_max[dayIndex];
     const rainSum = daily.precipitation_sum[dayIndex];
     
     // Direct index: each day starts at dayIndex * 24, mowing starts at 08:00
-    let startH = dayIndex * 24 + 8;
+    // (today: not before the current hour)
+    let startH = Math.max(dayIndex * 24 + 8, nowIdx);
     if (startH >= hourly.time.length) {
         startH = dayIndex * 24; // fallback to start of day
     }
@@ -1124,9 +1307,11 @@ function simulateHayDrying(dayIndex, daily, hourly) {
 /**
  * Update Soil and Plant Health UI (Agro Tab)
  */
-function updateSoilHealthUI(hourly) {
-    const hasSoilTemp = hourly && hourly.soil_temperature_6cm && hourly.soil_temperature_6cm[0] !== null && hourly.soil_temperature_6cm[0] !== undefined;
-    const hasSoilMoist = hourly && hourly.soil_moisture_3_to_9cm && hourly.soil_moisture_3_to_9cm[0] !== null && hourly.soil_moisture_3_to_9cm[0] !== undefined;
+function updateSoilHealthUI(hourly, nowIdx) {
+    const soilTemp = hourly.soil_temperature_6cm ? hourly.soil_temperature_6cm[nowIdx] : null;
+    const soilMoistureFraction = hourly.soil_moisture_3_to_9cm ? hourly.soil_moisture_3_to_9cm[nowIdx] : null;
+    const hasSoilTemp = soilTemp !== null && soilTemp !== undefined;
+    const hasSoilMoist = soilMoistureFraction !== null && soilMoistureFraction !== undefined;
     
     const soilTempValElement = document.getElementById('soilTempVal');
     const soilMoistValElement = document.getElementById('soilMoistVal');
@@ -1141,7 +1326,6 @@ function updateSoilHealthUI(hourly) {
     moistStatus.className = 'status-pill';
     
     if (hasSoilTemp) {
-        const soilTemp = hourly.soil_temperature_6cm[0];
         soilTempValElement.textContent = `${soilTemp.toFixed(1)} °C`;
         
         if (soilTemp <= 0) {
@@ -1169,7 +1353,6 @@ function updateSoilHealthUI(hourly) {
     }
     
     if (hasSoilMoist) {
-        const soilMoistureFraction = hourly.soil_moisture_3_to_9cm[0];
         const soilMoistPercent = Math.round(soilMoistureFraction * 100);
         soilMoistValElement.textContent = `${soilMoistPercent} %`;
         soilMoistBarElement.style.width = `${soilMoistPercent}%`;
@@ -1199,7 +1382,7 @@ function updateSoilHealthUI(hourly) {
         moistDesc.textContent = "Bodenfeuchtigkeit für diesen Standort aktuell nicht verfügbar.";
     }
     
-    const health = calculateAgroHealthIndices(hourly);
+    const health = calculateAgroHealthIndices(hourly, nowIdx);
     
     document.getElementById('beeIndexVal').textContent = `${health.bee}%`;
     document.getElementById('beeProgressBar').style.width = `${health.bee}%`;
@@ -1229,11 +1412,12 @@ function updateSoilHealthUI(hourly) {
 /**
  * Calculate Biological Indicators (Bees, Scab, Blight) for the next 24 hours
  */
-function calculateAgroHealthIndices(hourly) {
+function calculateAgroHealthIndices(hourly, nowIdx) {
+    const end = Math.min(nowIdx + 24, hourly.time.length);
     let beeSum = 0;
     let beeCount = 0;
     
-    for (let h = 0; h < 24; h++) {
+    for (let h = nowIdx; h < end; h++) {
         const timeObj = new Date(hourly.time[h]);
         const hour = timeObj.getHours();
         
@@ -1258,28 +1442,32 @@ function calculateAgroHealthIndices(hourly) {
     }
     const beeIndex = beeCount > 0 ? Math.round(beeSum / beeCount) : 0;
     
+    // Longest continuous leaf-wetness period and its average temperature
     let maxWetHours = 0;
+    let maxWetTempSum = 0;
     let currentWetHours = 0;
-    let wetTempSum = 0;
+    let currentWetTempSum = 0;
     
-    for (let h = 0; h < 24; h++) {
+    for (let h = nowIdx; h < end; h++) {
         const rh = hourly.relative_humidity_2m[h];
         const temp = hourly.temperature_2m[h];
         
         if (rh >= 85) {
             currentWetHours++;
-            wetTempSum += temp;
+            currentWetTempSum += temp;
             if (currentWetHours > maxWetHours) {
                 maxWetHours = currentWetHours;
+                maxWetTempSum = currentWetTempSum;
             }
         } else {
             currentWetHours = 0;
+            currentWetTempSum = 0;
         }
     }
     
     let scabIndex = 0;
     if (maxWetHours > 0) {
-        const avgWetTemp = wetTempSum / maxWetHours;
+        const avgWetTemp = maxWetTempSum / maxWetHours;
         let reqHours = 28;
         if (avgWetTemp >= 6 && avgWetTemp < 9) reqHours = 21;
         else if (avgWetTemp >= 9 && avgWetTemp < 12) reqHours = 14;
@@ -1290,7 +1478,7 @@ function calculateAgroHealthIndices(hourly) {
     }
     
     let blightHours = 0;
-    for (let h = 0; h < 24; h++) {
+    for (let h = nowIdx; h < end; h++) {
         const rh = hourly.relative_humidity_2m[h];
         const temp = hourly.temperature_2m[h];
         if (rh >= 90 && temp >= 10 && temp <= 24) {
