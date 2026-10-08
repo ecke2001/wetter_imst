@@ -16,7 +16,7 @@ npm test                              # Playwright smoke tests (tests/app.spec.j
 npx playwright test -g "offline"      # single test by name
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint + tests on every PR. The tests need no network: `tests/helpers.js` mocks Open-Meteo with `tests/mock-weather.js` (synthetic data relative to "now"), Windy and Google Fonts, and serves the CDN libraries from `node_modules`. Because those are the exact npm versions pinned in `package.json`, a wrong SRI hash in `index.html` fails the tests. Keep the `lucide`/`chart.js` devDependency versions in sync with the CDN URLs.
+CI (`.github/workflows/ci.yml`) runs lint + tests on every PR; on `main` the `deploy` job then uploads the app to the Hugging Face Space via `.github/scripts/deploy_hf_space.py` (token from the `HF_TOKEN` secret, Space id from the optional `HF_SPACE` variable). It deploys an explicit file list (`index.html index.css app.js theme-init.js icon.svg` + `README.md` for the Space front matter): a new app file must be added to that `cp` line, otherwise the job fails because `index.html` references a file that isn't deployed. Never put the token anywhere in the repo. The tests need no network: `tests/helpers.js` mocks Open-Meteo with `tests/mock-weather.js` (synthetic data relative to "now"), Windy and Google Fonts, and serves the CDN libraries from `node_modules`. Because those are the exact npm versions pinned in `package.json`, a wrong SRI hash in `index.html` fails the tests. Keep the `lucide`/`chart.js` devDependency versions in sync with the CDN URLs.
 
 ## Architecture
 
