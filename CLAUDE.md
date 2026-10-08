@@ -4,15 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-AgrarWetter Imst: a static, German-language weather app for farmers in the Imst district (Tirol). Plain HTML/CSS/vanilla JS with no framework, no build step, no package manager, no tests and no linter. UI text and code comments are German/English mixed; keep user-facing strings in German.
+AgrarWetter Imst: a static, German-language weather app for farmers in the Imst district (Tirol). Plain HTML/CSS/vanilla JS with no framework, no build step and no runtime dependencies; `package.json` holds dev tooling only (lint + browser tests). UI text and code comments are German/English mixed; keep user-facing strings in German.
 
 ## Running
 
 ```bash
-python3 -m http.server 8000   # then open http://localhost:8000
+python3 -m http.server 8000           # run the app, then open http://localhost:8000
+npm ci                                # install dev tooling
+npm run lint                          # ESLint (app.js), html-validate (index.html), Stylelint (index.css)
+npm test                              # Playwright smoke tests (tests/app.spec.js)
+npx playwright test -g "offline"      # single test by name
 ```
 
-There is no test or lint command. Verify changes by loading the page in a browser (Chromium/Playwright is available in the cloud environment).
+CI (`.github/workflows/ci.yml`) runs lint + tests on every PR. The tests need no network: `tests/helpers.js` mocks Open-Meteo with `tests/mock-weather.js` (synthetic data relative to "now"), Windy and Google Fonts, and serves the CDN libraries from `node_modules`. Because those are the exact npm versions pinned in `package.json`, a wrong SRI hash in `index.html` fails the tests. Keep the `lucide`/`chart.js` devDependency versions in sync with the CDN URLs.
 
 ## Architecture
 

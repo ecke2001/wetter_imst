@@ -36,3 +36,11 @@ Starte einen Webserver im Stammverzeichnis:
 python3 -m http.server 8000
 ```
 Öffne [http://localhost:8000](http://localhost:8000) im Browser.
+
+## Entwicklung
+Lint und Browser-Tests (benötigen Node.js; die App selbst braucht keinen Build-Schritt):
+```bash
+npm ci
+npm run lint   # ESLint, html-validate, Stylelint
+npm test       # Playwright-Smoke-Tests mit simulierten Wetterdaten
+```

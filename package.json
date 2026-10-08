@@ -1,0 +1,25 @@
+{
+  "name": "agrarwetter-imst",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling only (lint + browser smoke tests). The app itself has no build step and no runtime dependencies.",
+  "scripts": {
+    "lint": "npm run lint:js && npm run lint:html && npm run lint:css",
+    "lint:js": "eslint .",
+    "lint:html": "html-validate index.html",
+    "lint:css": "stylelint index.css",
+    "test": "playwright test",
+    "start": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.56.1",
+    "chart.js": "4.4.7",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "html-validate": "^11.16.2",
+    "lucide": "0.460.0",
+    "stylelint": "^17.16.0",
+    "stylelint-config-standard": "^40.0.0"
+  }
+}
