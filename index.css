@@ -375,6 +375,62 @@ a:hover {
     color: var(--text-warning);
 }
 
+/* "Heute am Hof" planner */
+.planner-card {
+    margin-bottom: 1.5rem;
+}
+
+.planner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+}
+
+.plan-tile {
+    background: var(--inset-bg);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--border-color-hover);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+}
+
+.plan-tile.good { border-left-color: var(--color-success); }
+.plan-tile.warn { border-left-color: var(--color-warning); }
+.plan-tile.bad { border-left-color: var(--color-danger); }
+
+.plan-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted);
+}
+
+.plan-title svg {
+    width: 14px;
+    height: 14px;
+}
+
+.plan-main {
+    font-family: var(--font-header);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text-strong);
+    margin: 0.3rem 0 0.15rem;
+}
+
+.plan-tile.good .plan-main { color: var(--text-success); }
+.plan-tile.bad .plan-main { color: var(--text-danger); }
+
+.plan-sub {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+}
+
 /* 6. Dashboard Grid (Current Weather + Indices) */
 .dashboard-grid {
     display: grid;
@@ -744,6 +800,38 @@ a:hover {
 .forecast-day-row.expanded .row-toggle-icon {
     transform: rotate(180deg);
     color: var(--color-text-strong);
+}
+
+/* Days 8-14 are collapsed behind the "Weitere 7 Tage" button */
+.forecast-list:not(.show-all) .extra-day {
+    display: none;
+}
+
+.forecast-more-btn {
+    margin-top: 1rem;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--overlay-1);
+    border: 1px dashed var(--border-color-hover);
+    color: var(--color-text-main);
+    border-radius: 12px;
+    padding: 0.7rem;
+    font-family: var(--font-header);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.forecast-more-btn:hover {
+    background: var(--overlay-2);
+}
+
+.forecast-more-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 /* Accordion Hourly Details */
@@ -1151,9 +1239,105 @@ a:hover {
     color: var(--pill-info-text);
 }
 
-/* Theme toggle (icon-only variant of the GPS pill) */
-.theme-btn {
+/* Icon-only variant of the GPS pill (save field, delete field, theme) */
+.icon-btn {
     padding: 0.5rem 0.7rem;
+}
+
+.icon-btn.danger {
+    color: var(--text-danger);
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.icon-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: var(--color-danger);
+    color: var(--text-danger);
+}
+
+/* Tab labels: short variant only on phones */
+.label-short {
+    display: none;
+}
+
+/* "Feld speichern" dialog */
+.field-dialog {
+    margin: auto;
+    width: min(420px, calc(100vw - 2rem));
+    background: var(--bg-base);
+    color: var(--color-text-main);
+    border: 1px solid var(--border-color-hover);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-main);
+}
+
+.field-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.field-dialog form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.field-dialog label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    margin-top: 0.5rem;
+}
+
+.field-dialog input {
+    background: var(--overlay-2);
+    border: 1px solid var(--border-color-hover);
+    border-radius: 10px;
+    color: var(--color-text-strong);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    padding: 0.6rem 0.8rem;
+}
+
+.field-dialog input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+.field-coords,
+.field-hint {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.field-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn-primary,
+.btn-secondary {
+    border-radius: 99px;
+    padding: 0.55rem 1.2rem;
+    font-family: var(--font-header);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: 1px solid var(--border-color-hover);
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--color-text-main);
 }
 
 @keyframes gps-pulse-anim {
@@ -1309,9 +1493,66 @@ a:hover {
         font-size: 1.6rem;
     }
     
+    /* Bottom tab bar, reachable with the thumb */
+    body {
+        padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+    
+    .app-header {
+        padding-bottom: 1rem;
+        /* backdrop-filter would turn the header into the containing block of the fixed tab bar */
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    
+    .header-main {
+        margin-bottom: 0;
+    }
+    
+    .tab-navigation {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        gap: 0;
+        justify-content: space-around;
+        background: var(--bg-base);
+        border-bottom: none;
+        border-top: 1px solid var(--border-color-hover);
+        padding-bottom: env(safe-area-inset-bottom);
+        box-shadow: 0 -6px 20px -12px rgba(0, 0, 0, 0.5);
+    }
+    
     .tab-btn {
-        padding: 0.6rem 0.85rem;
-        font-size: 0.85rem;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.15rem;
+        padding: 0.55rem 0.25rem 0.5rem;
+        font-size: 0.72rem;
+        border-bottom: none;
+        border-top: 3px solid transparent;
+    }
+    
+    .tab-btn:hover {
+        border-bottom-color: transparent;
+    }
+    
+    .tab-btn.active {
+        border-top-color: var(--color-primary);
+    }
+    
+    .tab-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .label-long {
+        display: none;
+    }
+    
+    .label-short {
+        display: inline;
     }
     
     .card {
@@ -1337,18 +1578,34 @@ a:hover {
         text-align: left;
     }
     
+    /* Compact two-line forecast rows */
     .forecast-day-summary {
-        padding: 0.75rem 1rem;
-        gap: 0.75rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto 18px;
+        grid-template-areas:
+            "day icon temps toggle"
+            "rain badge badge badge";
+        align-items: center;
+        padding: 0.6rem 0.85rem;
+        gap: 0.3rem 0.75rem;
     }
     
     .day-name-date {
-        min-width: 85px;
+        grid-area: day;
+        min-width: 0;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 0.4rem;
     }
     
     .day-icon-desc {
+        grid-area: icon;
         min-width: unset;
-        flex-grow: 1;
+    }
+    
+    .day-icon svg {
+        width: 24px;
+        height: 24px;
     }
     
     .day-desc {
@@ -1356,19 +1613,29 @@ a:hover {
     }
     
     .day-temps {
+        grid-area: temps;
         min-width: unset;
+    }
+    
+    .row-toggle-icon {
+        grid-area: toggle;
     }
     
     .day-rain {
+        grid-area: rain;
         min-width: unset;
+        font-size: 0.8rem;
     }
     
     .day-heu-badge-container {
+        grid-area: badge;
         min-width: unset;
-        width: 100%;
-        text-align: left;
-        margin-top: 0.25rem;
-        padding-left: 38px; /* Align with icon */
+        text-align: right;
+    }
+    
+    .heu-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.6rem;
     }
     
     .portals-grid {

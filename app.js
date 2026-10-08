@@ -10,6 +10,8 @@ let tempChartInstance = null;
 let precipWindChartInstance = null;
 
 const CACHE_KEY = 'agrarwetter_cache';
+const PAST_DAYS = 7;       // for the rain sum of the last week
+const FORECAST_DAYS = 14;
 const THEME_KEY = 'agrarwetter_theme';
 
 // Theme preference cycle; "auto" follows the device setting
@@ -41,8 +43,12 @@ const LOCATIONS = {
     soelden: { lat: 46.9677, lon: 11.0078, label: "Sölden (1368m)" }
 };
 
+const FIELDS_KEY = 'agrarwetter_fields';
+const FIELD_PREFIX = 'field:';
+
 let currentLat = LOCATIONS.imst.lat;
 let currentLon = LOCATIONS.imst.lon;
+let currentElevation = null; // metres; null = Open-Meteo picks the terrain height
 let currentLocationKey = 'imst';
 
 /**
@@ -103,35 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Lucide Icons
     refreshIcons();
 
-    // Restore location from localStorage
-    const savedLoc = localStorage.getItem('agrarwetter_loc');
-    const savedLat = localStorage.getItem('agrarwetter_lat');
-    const savedLon = localStorage.getItem('agrarwetter_lon');
+    bindEvents();
     
-    if (savedLoc && LOCATIONS[savedLoc]) {
-        currentLocationKey = savedLoc;
-        currentLat = LOCATIONS[savedLoc].lat;
-        currentLon = LOCATIONS[savedLoc].lon;
-        document.getElementById('locationSelect').value = savedLoc;
-    } else if (savedLat && savedLon) {
-        currentLocationKey = 'gps';
-        currentLat = parseFloat(savedLat);
-        currentLon = parseFloat(savedLon);
-        
-        const nearestKey = findNearestLocation(currentLat, currentLon);
-        const nearestName = LOCATIONS[nearestKey].label.split(' (')[0];
-        
-        // Add GPS option dynamically if it was loaded
-        const select = document.getElementById('locationSelect');
-        let gpsOpt = select.querySelector('option[value="gps"]');
-        if (!gpsOpt) {
-            gpsOpt = document.createElement('option');
-            gpsOpt.value = 'gps';
-            select.appendChild(gpsOpt);
-        }
-        gpsOpt.textContent = `GPS (nahe ${nearestName})`;
-        select.value = 'gps';
-    }
+    // Restore location from localStorage
+    restoreLocation();
     
     // Set Windy Radar Source
     initRadar();
@@ -159,6 +140,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+/**
+ * Wire up all UI events (no inline handlers, so a strict CSP can forbid inline script)
+ */
+function bindEvents() {
+    document.getElementById('locationSelect').addEventListener('change', handleLocationChange);
+    document.getElementById('gpsBtn').addEventListener('click', requestGPSLocation);
+    document.getElementById('saveFieldBtn').addEventListener('click', openFieldDialog);
+    document.getElementById('deleteFieldBtn').addEventListener('click', deleteCurrentField);
+    document.getElementById('themeBtn').addEventListener('click', cycleTheme);
+    document.getElementById('fieldForm').addEventListener('submit', handleFieldSubmit);
+    document.getElementById('fieldCancelBtn').addEventListener('click', () => document.getElementById('fieldDialog').close());
+    document.getElementById('forecastMoreBtn').addEventListener('click', toggleForecastMore);
+    
+    document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+    
+    // Forecast rows are re-rendered on every load, so delegate from the list
+    const forecastList = document.getElementById('forecastList');
+    const toggleFromEvent = (event) => {
+        const summary = event.target.closest('.forecast-day-summary');
+        if (summary) toggleForecastAccordion(Number(summary.dataset.day));
+    };
+    forecastList.addEventListener('click', toggleFromEvent);
+    forecastList.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleFromEvent(event);
+        }
+    });
+}
 
 /**
  * Tab Switching Functionality
@@ -210,7 +223,19 @@ function initRadar(force = false) {
  * Fetch Weather Data from Open-Meteo
  */
 async function fetchWeatherData() {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,et0_fao_evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_6cm,soil_moisture_3_to_9cm&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration&timezone=Europe%2FBerlin`;
+    const params = new URLSearchParams({
+        latitude: currentLat,
+        longitude: currentLon,
+        current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m',
+        hourly: 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,et0_fao_evapotranspiration,wind_speed_10m,wind_gusts_10m,shortwave_radiation,soil_temperature_0cm,soil_temperature_6cm,soil_moisture_3_to_9cm,weather_code',
+        daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,shortwave_radiation_sum,et0_fao_evapotranspiration',
+        timezone: 'Europe/Berlin',
+        past_days: PAST_DAYS,
+        forecast_days: FORECAST_DAYS
+    });
+    // Exact field elevation improves temperature/frost downscaling in alpine terrain
+    if (currentElevation !== null) params.set('elevation', currentElevation);
+    const url = `https://api.open-meteo.com/v1/forecast?${params}`;
     
     // Show loading state in UI
     const updateTimeEl = document.getElementById('updateTime');
@@ -257,6 +282,11 @@ function renderWeather(data) {
     const nowIdx = getCurrentHourIndex(data);
     const pastDays = Math.floor(nowIdx / 24);
     if (pastDays >= data.daily.time.length) return false;
+    
+    // Rain of the last 7 days (requested via past_days) before past days are dropped
+    const pastRainDays = data.daily.precipitation_sum.slice(Math.max(0, pastDays - PAST_DAYS), pastDays);
+    const pastRain = { sum: pastRainDays.reduce((a, b) => a + (b || 0), 0), days: pastRainDays.length };
+    
     if (pastDays > 0) dropPastDays(data, pastDays);
     
     weatherData = data;
@@ -269,7 +299,9 @@ function renderWeather(data) {
     
     updateForecastUI(data.daily, data.hourly, currentHourIdx);
     
-    updateSoilHealthUI(data.hourly, currentHourIdx);
+    updateFarmPlanner(data.daily, data.hourly, currentHourIdx);
+    
+    updateSoilHealthUI(data.hourly, currentHourIdx, pastRain);
     
     renderCharts(data.hourly, currentHourIdx);
     
@@ -316,7 +348,7 @@ function dropPastDays(data, n) {
  */
 function saveCache(data) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), lat: currentLat, lon: currentLon, data }));
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), lat: currentLat, lon: currentLon, elevation: currentElevation, data }));
     } catch (e) {
         console.warn("Wetterdaten konnten nicht offline gespeichert werden:", e);
     }
@@ -325,7 +357,8 @@ function saveCache(data) {
 function loadCache() {
     try {
         const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
-        if (cached && cached.lat === currentLat && cached.lon === currentLon && cached.data) return cached;
+        if (cached && cached.lat === currentLat && cached.lon === currentLon
+            && (cached.elevation ?? null) === currentElevation && cached.data) return cached;
     } catch (e) { /* storage unavailable or corrupt */ }
     return null;
 }
@@ -592,43 +625,47 @@ function calculateSpritzIndex(hourly, nowIdx) {
     const limit = Math.min(nowIdx + 12, hourly.temperature_2m.length);
     
     for (let h = nowIdx; h < limit; h++) {
-        const temp = hourly.temperature_2m[h];
-        const wind = hourly.wind_speed_10m[h];
-        const gust = hourly.wind_gusts_10m[h];
-        
-        // Rain checks (current and next 3 hours)
-        let rainPenalty = 0;
-        for (let nextH = h; nextH < Math.min(h + 4, hourly.precipitation.length); nextH++) {
-            if (hourly.precipitation[nextH] > 0.1) {
-                rainPenalty = 100; // Rain washes spray away
-                break;
-            }
-        }
-        
-        // Wind drift assessment (Ideal: < 10 km/h, max gusts < 18 km/h)
-        let windScore = 100;
-        if (wind > 15 || gust > 25) {
-            windScore = 0; // Too much drift
-        } else if (wind > 8) {
-            windScore = 100 - ((wind - 8) / 7) * 70; // moderate drift
-        }
-        
-        // Temperature check (Ideal: 10 - 20°C)
-        let tempScore = 100;
-        if (temp < 6 || temp > 25) {
-            tempScore = 0; // Too cold (ineffective) or too hot (volatilization/crop stress)
-        } else if (temp < 10) {
-            tempScore = 100 - ((10 - temp) / 4) * 50;
-        } else if (temp > 20) {
-            tempScore = 100 - ((temp - 20) / 5) * 60;
-        }
-        
-        const hourScore = Math.max(0, (100 - rainPenalty) * (windScore / 100) * (tempScore / 100));
-        scoresSum += hourScore;
+        scoresSum += sprayHourScore(hourly, h);
         count++;
     }
     
     return count > 0 ? Math.round(scoresSum / count) : 0;
+}
+
+/**
+ * Spray suitability (0-100) of a single hour
+ */
+function sprayHourScore(hourly, h) {
+    const temp = hourly.temperature_2m[h];
+    const wind = hourly.wind_speed_10m[h];
+    const gust = hourly.wind_gusts_10m[h];
+    
+    // Rain checks (current and next 3 hours)
+    for (let nextH = h; nextH < Math.min(h + 4, hourly.precipitation.length); nextH++) {
+        if (hourly.precipitation[nextH] > 0.1) {
+            return 0; // Rain washes spray away
+        }
+    }
+    
+    // Wind drift assessment (Ideal: < 10 km/h, max gusts < 18 km/h)
+    let windScore = 100;
+    if (wind > 15 || gust > 25) {
+        windScore = 0; // Too much drift
+    } else if (wind > 8) {
+        windScore = 100 - ((wind - 8) / 7) * 70; // moderate drift
+    }
+    
+    // Temperature check (Ideal: 10 - 20°C)
+    let tempScore = 100;
+    if (temp < 6 || temp > 25) {
+        tempScore = 0; // Too cold (ineffective) or too hot (volatilization/crop stress)
+    } else if (temp < 10) {
+        tempScore = 100 - ((10 - temp) / 4) * 50;
+    } else if (temp > 20) {
+        tempScore = 100 - ((temp - 20) / 5) * 60;
+    }
+    
+    return Math.max(0, windScore * tempScore / 100);
 }
 
 /**
@@ -803,11 +840,11 @@ function updateForecastUI(daily, hourly, nowIdx) {
         
         // Create the row element
         const row = document.createElement('div');
-        row.className = 'forecast-day-row';
+        row.className = i < 7 ? 'forecast-day-row' : 'forecast-day-row extra-day';
         row.id = `forecastRow-${i}`;
         
         row.innerHTML = `
-            <div class="forecast-day-summary" onclick="toggleForecastAccordion(${i})">
+            <div class="forecast-day-summary" data-day="${i}" role="button" tabindex="0" aria-expanded="false">
                 <div class="day-name-date">
                     <span class="day-name">${weekday}</span>
                     <span class="day-date">${formattedDate}</span>
@@ -864,7 +901,16 @@ function updateForecastUI(daily, hourly, nowIdx) {
         listContainer.appendChild(row);
     }
     
+    document.getElementById('forecastMoreBtn').classList.toggle('hide', daily.time.length <= 7);
+}
 
+/**
+ * Show/hide forecast days 8-14
+ */
+function toggleForecastMore() {
+    const list = document.getElementById('forecastList');
+    const showAll = list.classList.toggle('show-all');
+    document.getElementById('forecastMoreText').textContent = showAll ? 'Weniger Tage anzeigen' : 'Weitere 7 Tage anzeigen';
 }
 
 /**
@@ -919,17 +965,20 @@ function toggleForecastAccordion(dayIndex) {
     if (row.classList.contains('expanded')) {
         // Collapse
         row.classList.remove('expanded');
+        row.querySelector('.forecast-day-summary').setAttribute('aria-expanded', 'false');
         detailPanel.style.maxHeight = '0';
     } else {
         // Collapse all others first for clean view
         document.querySelectorAll('.forecast-day-row').forEach(otherRow => {
             otherRow.classList.remove('expanded');
+            otherRow.querySelector('.forecast-day-summary').setAttribute('aria-expanded', 'false');
             const otherDetail = otherRow.querySelector('.day-hourly-details');
             if (otherDetail) otherDetail.style.maxHeight = '0';
         });
         
         // Expand this one
         row.classList.add('expanded');
+        row.querySelector('.forecast-day-summary').setAttribute('aria-expanded', 'true');
         // Animate to the real content height (fixed values clip the table on phones)
         detailPanel.style.maxHeight = `${detailPanel.scrollHeight}px`;
     }
@@ -1132,30 +1181,136 @@ function renderCharts(hourly, nowIdx) {
 }
 
 /**
+ * Saved fields ("Meine Felder"): [{ id, name, lat, lon, elevation }] in localStorage.
+ * Stored data is validated on read since localStorage can contain anything.
+ */
+function loadFields() {
+    let raw;
+    try { raw = JSON.parse(localStorage.getItem(FIELDS_KEY)); } catch (e) { return []; }
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(f => f && typeof f.id === 'string' && typeof f.name === 'string'
+        && Number.isFinite(f.lat) && Math.abs(f.lat) <= 90
+        && Number.isFinite(f.lon) && Math.abs(f.lon) <= 180
+        && (f.elevation === null || Number.isFinite(f.elevation)));
+}
+
+function saveFields(fields) {
+    try {
+        localStorage.setItem(FIELDS_KEY, JSON.stringify(fields));
+    } catch (e) {
+        alert("Feld konnte nicht gespeichert werden (Speicher nicht verfügbar).");
+    }
+}
+
+function findField(key) {
+    if (!key || !key.startsWith(FIELD_PREFIX)) return null;
+    const id = key.slice(FIELD_PREFIX.length);
+    return loadFields().find(f => f.id === id) || null;
+}
+
+/**
+ * Rebuild the dynamic parts of the location dropdown (saved fields, GPS entry)
+ */
+function renderLocationOptions() {
+    const select = document.getElementById('locationSelect');
+    
+    let group = document.getElementById('fieldsGroup');
+    if (!group) {
+        group = document.createElement('optgroup');
+        group.id = 'fieldsGroup';
+        group.label = 'Meine Felder';
+        select.appendChild(group);
+    }
+    group.replaceChildren();
+    for (const field of loadFields()) {
+        const opt = document.createElement('option');
+        opt.value = FIELD_PREFIX + field.id;
+        opt.textContent = field.elevation !== null ? `${field.name} (${Math.round(field.elevation)}m)` : field.name;
+        group.appendChild(opt);
+    }
+    group.hidden = group.children.length === 0;
+    
+    let gpsOpt = select.querySelector('option[value="gps"]');
+    if (currentLocationKey === 'gps') {
+        if (!gpsOpt) {
+            gpsOpt = document.createElement('option');
+            gpsOpt.value = 'gps';
+            select.insertBefore(gpsOpt, group);
+        }
+        const nearestName = LOCATIONS[findNearestLocation(currentLat, currentLon)].label.split(' (')[0];
+        gpsOpt.textContent = `GPS (nahe ${nearestName})`;
+    }
+    
+    select.value = currentLocationKey;
+    document.getElementById('deleteFieldBtn').classList.toggle('hide', !currentLocationKey.startsWith(FIELD_PREFIX));
+}
+
+/**
+ * Switch to a location, persist it and reload the weather
+ */
+function setLocation(key, lat, lon, elevation = null, { reload = true } = {}) {
+    currentLocationKey = key;
+    currentLat = lat;
+    currentLon = lon;
+    currentElevation = elevation;
+    
+    try {
+        localStorage.setItem('agrarwetter_loc', key);
+        if (key === 'gps') {
+            localStorage.setItem('agrarwetter_lat', lat);
+            localStorage.setItem('agrarwetter_lon', lon);
+        } else {
+            localStorage.removeItem('agrarwetter_lat');
+            localStorage.removeItem('agrarwetter_lon');
+        }
+    } catch (e) { /* storage unavailable */ }
+    
+    renderLocationOptions();
+    if (reload) {
+        initRadar();
+        fetchWeatherData();
+    }
+}
+
+/**
+ * Restore the last location on startup (preset, saved field or GPS)
+ */
+function restoreLocation() {
+    let savedLoc = null, savedLat = NaN, savedLon = NaN;
+    try {
+        savedLoc = localStorage.getItem('agrarwetter_loc');
+        savedLat = parseFloat(localStorage.getItem('agrarwetter_lat'));
+        savedLon = parseFloat(localStorage.getItem('agrarwetter_lon'));
+    } catch (e) { /* storage unavailable */ }
+    
+    const field = findField(savedLoc);
+    if (savedLoc && LOCATIONS[savedLoc]) {
+        setLocation(savedLoc, LOCATIONS[savedLoc].lat, LOCATIONS[savedLoc].lon, null, { reload: false });
+    } else if (field) {
+        setLocation(savedLoc, field.lat, field.lon, field.elevation, { reload: false });
+    } else if (Number.isFinite(savedLat) && Number.isFinite(savedLon)) {
+        setLocation('gps', savedLat, savedLon, null, { reload: false });
+    } else {
+        renderLocationOptions();
+    }
+}
+
+/**
  * Handle selection change in the location dropdown
  */
 function handleLocationChange() {
-    const select = document.getElementById('locationSelect');
-    const value = select.value;
+    const value = document.getElementById('locationSelect').value;
     
     if (value === 'gps') {
         requestGPSLocation();
         return;
     }
     
+    const field = findField(value);
     if (LOCATIONS[value]) {
-        currentLocationKey = value;
-        currentLat = LOCATIONS[value].lat;
-        currentLon = LOCATIONS[value].lon;
-        
-        // Save to localStorage
-        localStorage.setItem('agrarwetter_loc', value);
-        localStorage.removeItem('agrarwetter_lat');
-        localStorage.removeItem('agrarwetter_lon');
-        
-        // Refresh UI
-        initRadar();
-        fetchWeatherData();
+        setLocation(value, LOCATIONS[value].lat, LOCATIONS[value].lon);
+    } else if (field) {
+        setLocation(value, field.lat, field.lon, field.elevation);
     }
 }
 
@@ -1164,56 +1319,62 @@ function handleLocationChange() {
  */
 function requestGPSLocation() {
     const gpsBtn = document.getElementById('gpsBtn');
-    gpsBtn.classList.add('searching');
     
     if (!navigator.geolocation) {
         alert("GPS-Ortung wird von diesem Browser nicht unterstützt.");
-        gpsBtn.classList.remove('searching');
         return;
     }
+    gpsBtn.classList.add('searching');
     
     navigator.geolocation.getCurrentPosition(
         (position) => {
-            currentLat = position.coords.latitude;
-            currentLon = position.coords.longitude;
-            currentLocationKey = 'gps';
-            
-            // Save to localStorage
-            localStorage.removeItem('agrarwetter_loc');
-            localStorage.setItem('agrarwetter_lat', currentLat);
-            localStorage.setItem('agrarwetter_lon', currentLon);
-            
-            // Update dropdown display
-            const nearestKey = findNearestLocation(currentLat, currentLon);
-            const nearestName = LOCATIONS[nearestKey].label.split(' (')[0];
-            
-            const select = document.getElementById('locationSelect');
-            let gpsOpt = select.querySelector('option[value="gps"]');
-            if (!gpsOpt) {
-                gpsOpt = document.createElement('option');
-                gpsOpt.value = 'gps';
-                select.appendChild(gpsOpt);
-            }
-            gpsOpt.textContent = `GPS (nahe ${nearestName})`;
-            select.value = 'gps';
-            
             gpsBtn.classList.remove('searching');
-            
-            // Refresh UI
-            initRadar();
-            fetchWeatherData();
+            setLocation('gps', position.coords.latitude, position.coords.longitude);
         },
         (error) => {
             console.error("GPS Fehler:", error);
             alert("Standort konnte nicht ermittelt werden. Fallback auf Imst.");
             gpsBtn.classList.remove('searching');
-            // Fallback to Imst
-            const select = document.getElementById('locationSelect');
-            select.value = 'imst';
-            handleLocationChange();
+            setLocation('imst', LOCATIONS.imst.lat, LOCATIONS.imst.lon);
         },
         { enableHighAccuracy: true, timeout: 10000 }
     );
+}
+
+/**
+ * "Feld speichern" dialog: store the current location under a name, optionally with
+ * the exact elevation of the meadow (alpine valleys: a few hundred metres decide frost)
+ */
+function openFieldDialog() {
+    const dialog = document.getElementById('fieldDialog');
+    const form = document.getElementById('fieldForm');
+    form.reset();
+    document.getElementById('fieldCoords').textContent = `${currentLat.toFixed(4)}° N, ${currentLon.toFixed(4)}° O`;
+    const elevation = currentElevation ?? (weatherData && weatherData.elevation);
+    document.getElementById('fieldElevation').value = Number.isFinite(elevation) ? Math.round(elevation) : '';
+    dialog.showModal();
+}
+
+function handleFieldSubmit(event) {
+    event.preventDefault();
+    const name = document.getElementById('fieldName').value.trim().slice(0, 40);
+    const elevationInput = document.getElementById('fieldElevation').value.trim();
+    const elevation = elevationInput === '' ? null : Number(elevationInput);
+    
+    if (!name) return;
+    if (elevation !== null && !(Number.isFinite(elevation) && elevation >= 0 && elevation <= 4000)) return;
+    
+    const field = { id: Date.now().toString(36), name, lat: currentLat, lon: currentLon, elevation };
+    saveFields([...loadFields(), field]);
+    document.getElementById('fieldDialog').close();
+    setLocation(FIELD_PREFIX + field.id, field.lat, field.lon, field.elevation);
+}
+
+function deleteCurrentField() {
+    const field = findField(currentLocationKey);
+    if (!field || !confirm(`Feld "${field.name}" löschen?`)) return;
+    saveFields(loadFields().filter(f => f.id !== field.id));
+    setLocation('imst', LOCATIONS.imst.lat, LOCATIONS.imst.lon);
 }
 
 /**
@@ -1307,7 +1468,7 @@ function simulateHayDrying(dayIndex, daily, hourly, nowIdx) {
 /**
  * Update Soil and Plant Health UI (Agro Tab)
  */
-function updateSoilHealthUI(hourly, nowIdx) {
+function updateSoilHealthUI(hourly, nowIdx, pastRain) {
     const soilTemp = hourly.soil_temperature_6cm ? hourly.soil_temperature_6cm[nowIdx] : null;
     const soilMoistureFraction = hourly.soil_moisture_3_to_9cm ? hourly.soil_moisture_3_to_9cm[nowIdx] : null;
     const hasSoilTemp = soilTemp !== null && soilTemp !== undefined;
@@ -1382,6 +1543,9 @@ function updateSoilHealthUI(hourly, nowIdx) {
         moistDesc.textContent = "Bodenfeuchtigkeit für diesen Standort aktuell nicht verfügbar.";
     }
     
+    updatePastRainUI(pastRain);
+    updateFrostUI(hourly, nowIdx);
+    
     const health = calculateAgroHealthIndices(hourly, nowIdx);
     
     document.getElementById('beeIndexVal').textContent = `${health.bee}%`;
@@ -1407,6 +1571,216 @@ function updateSoilHealthUI(hourly, nowIdx) {
     if (health.blight >= 70) { blightBadge.textContent = "Sehr hoch"; blightBadge.classList.add('danger'); }
     else if (health.blight >= 35) { blightBadge.textContent = "Mäßig"; blightBadge.classList.add('warning'); }
     else { blightBadge.textContent = "Gering"; blightBadge.classList.add('success'); }
+}
+
+/**
+ * "Heute am Hof": concrete work recommendations from the indices above
+ */
+function updateFarmPlanner(daily, hourly, nowIdx) {
+    const today = hourly.time[nowIdx].slice(0, 10);
+    const nowHour = new Date(hourly.time[nowIdx]).getHours();
+    const planDays = Math.min(7, daily.time.length);
+    
+    // 1. Spray windows: daylight hours with a good score, at least 2 h long
+    const windows = findSprayWindows(hourly, nowIdx);
+    if (windows.length > 0) {
+        setPlannerTile('planSpray', 'good',
+            windows.slice(0, 2).map(w => formatWindow(hourly, w, today)).join(', '),
+            'Wenig Wind, kein Regen in den Folgestunden.');
+    } else {
+        setPlannerTile('planSpray', 'bad', 'Kein Spritzfenster', 'In den nächsten 36 Std. zu windig, zu nass oder ungünstige Temperatur.');
+    }
+    
+    // 2. Mowing: next good Heuwetter day (today only if it is still morning)
+    const mow = pickPlanDay(nowHour >= 11 ? 1 : 0, planDays, 70, d => calculateHeuIndex(d, daily));
+    if (mow.value >= 50) {
+        setPlannerTile('planMow', mow.value >= 70 ? 'good' : 'warn',
+            `${formatDayWord(daily.time[mow.day], today)} (${mow.value}%)`,
+            simulateHayDrying(mow.day, daily, hourly, nowIdx).text);
+    } else {
+        setPlannerTile('planMow', 'bad', 'Kein sicheres Heuwetter',
+            'In den nächsten 7 Tagen keine 3 trockenen Tage am Stück.');
+    }
+    
+    // 3. Slurry: next good Gülle day
+    const guelle = pickPlanDay(0, planDays, 60, d => calculateGuelleIndex(d, daily));
+    setPlannerTile('planGuelle', guelle.value >= 60 ? 'good' : guelle.value >= 40 ? 'warn' : 'bad',
+        `${formatDayWord(daily.time[guelle.day], today)} (${guelle.value}%)`,
+        guelle.value >= 60 ? 'Kühl, bedeckt oder leichter Regen.' : 'Kein idealer Tag – Ammoniakverluste beachten.');
+    
+    // 4. Warnings: frost, storm gusts, heavy rain, thunderstorms
+    const warnings = [];
+    const frost = findFrost(hourly, nowIdx);
+    if (frost.airFrost) warnings.push(`Frost bis ${frost.minAir.value.toFixed(0)} °C (${formatHourLabel(hourly.time[frost.minAir.idx])})`);
+    else if (frost.groundFrost) warnings.push(`Bodenfrost möglich (${formatHourLabel(hourly.time[frost.minAir.idx])})`);
+    
+    let maxGust = { value: 0, idx: -1 };
+    for (let h = nowIdx; h < Math.min(nowIdx + 24, hourly.time.length); h++) {
+        if (hourly.wind_gusts_10m[h] > maxGust.value) maxGust = { value: hourly.wind_gusts_10m[h], idx: h };
+    }
+    if (maxGust.value > 60) warnings.push(`Sturmböen bis ${Math.round(maxGust.value)} km/h (${formatHourLabel(hourly.time[maxGust.idx])})`);
+    
+    for (let d = 0; d < Math.min(3, daily.time.length); d++) {
+        const dayWord = formatDayWord(daily.time[d], today);
+        if (daily.weather_code[d] >= 95) warnings.push(`Gewittergefahr ${dayWord}`);
+        else if (daily.precipitation_sum[d] >= 20) warnings.push(`Starkregen ${dayWord} (${daily.precipitation_sum[d].toFixed(0)} mm)`);
+    }
+    
+    if (warnings.length > 0) {
+        setPlannerTile('planWarn', 'bad', warnings[0], warnings.slice(1, 3).join(' · ') || 'Arbeiten entsprechend planen.');
+    } else {
+        setPlannerTile('planWarn', 'good', 'Keine Warnungen', 'Kein Frost, Sturm oder Starkregen in Sicht.');
+    }
+}
+
+/**
+ * Earliest day in [from, to) whose score reaches goodScore, else the best-scoring day
+ */
+function pickPlanDay(from, to, goodScore, scoreFn) {
+    let best = { day: from, value: -1 };
+    for (let d = from; d < to; d++) {
+        const value = scoreFn(d);
+        if (value >= goodScore) return { day: d, value };
+        if (value > best.value) best = { day: d, value };
+    }
+    return best;
+}
+
+/**
+ * Runs of consecutive daylight hours (05-21 Uhr) with spray score >= minScore
+ */
+function findSprayWindows(hourly, nowIdx, hours = 36, minScore = 70, minLength = 2) {
+    const windows = [];
+    const end = Math.min(nowIdx + hours, hourly.time.length);
+    let runStart = -1;
+    for (let h = nowIdx; h <= end; h++) {
+        const hour = h < end ? new Date(hourly.time[h]).getHours() : -1;
+        const ok = h < end && hour >= 5 && hour < 21 && sprayHourScore(hourly, h) >= minScore;
+        if (ok && runStart < 0) runStart = h;
+        if (!ok && runStart >= 0) {
+            if (h - runStart >= minLength) windows.push({ start: runStart, end: h });
+            runStart = -1;
+        }
+    }
+    return windows;
+}
+
+function formatWindow(hourly, w, today) {
+    const startHour = new Date(hourly.time[w.start]).getHours();
+    const endHour = new Date(hourly.time[w.end - 1]).getHours() + 1;
+    const pad = n => String(n).padStart(2, '0');
+    return `${formatDayWord(hourly.time[w.start].slice(0, 10), today)} ${pad(startHour)}–${pad(endHour)} Uhr`;
+}
+
+/**
+ * "Heute" / "Morgen" / "Fr 10.10." for a YYYY-MM-DD date
+ */
+function formatDayWord(dateStr, today) {
+    const diff = Math.round((new Date(`${dateStr}T00:00`) - new Date(`${today}T00:00`)) / 86400000);
+    if (diff === 0) return 'Heute';
+    if (diff === 1) return 'Morgen';
+    return new Date(`${dateStr}T00:00`).toLocaleDateString('de-AT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+}
+
+function setPlannerTile(id, status, main, sub) {
+    const tile = document.getElementById(id);
+    tile.classList.remove('good', 'warn', 'bad');
+    tile.classList.add(status);
+    tile.querySelector('.plan-main').textContent = main;
+    tile.querySelector('.plan-sub').textContent = sub;
+}
+
+/**
+ * Rain of the last 7 days (water supply, trafficability, slurry runoff risk)
+ */
+function updatePastRainUI(pastRain) {
+    const valEl = document.getElementById('pastRainVal');
+    const status = document.getElementById('pastRainStatus');
+    const desc = document.getElementById('pastRainDesc');
+    status.className = 'status-pill';
+    
+    if (!pastRain || pastRain.days === 0) {
+        valEl.textContent = '-- mm';
+        status.textContent = 'Keine Daten';
+        status.classList.add('warning');
+        desc.textContent = 'Niederschlag der Vortage nicht verfügbar.';
+        return;
+    }
+    
+    valEl.textContent = `${pastRain.sum.toFixed(1)} mm`;
+    if (pastRain.sum < 5) {
+        status.textContent = 'Trocken';
+        status.classList.add('warning');
+        desc.textContent = 'Kaum Regen in den letzten Tagen – Bewässerung prüfen.';
+    } else if (pastRain.sum <= 40) {
+        status.textContent = 'Normal';
+        status.classList.add('success');
+        desc.textContent = 'Ausreichende Niederschläge in der letzten Woche.';
+    } else {
+        status.textContent = 'Sehr nass';
+        status.classList.add('info');
+        desc.textContent = 'Viel Regen – Befahrbarkeit und Abschwemmung (Gülle) beachten.';
+    }
+}
+
+/**
+ * Frost outlook for the next 48 hours: air (2 m) and ground surface (0 cm)
+ */
+function findFrost(hourly, nowIdx, hours = 48) {
+    const end = Math.min(nowIdx + hours, hourly.time.length);
+    let minAir = { value: Infinity, idx: -1 };
+    let minGround = { value: Infinity, idx: -1 };
+    for (let h = nowIdx; h < end; h++) {
+        const air = hourly.temperature_2m[h];
+        const ground = hourly.soil_temperature_0cm ? hourly.soil_temperature_0cm[h] : null;
+        if (Number.isFinite(air) && air < minAir.value) minAir = { value: air, idx: h };
+        if (Number.isFinite(ground) && ground < minGround.value) minGround = { value: ground, idx: h };
+    }
+    // Ground frost is likely in clear nights when the 2 m temperature drops below ~2 °C
+    const groundFrost = (minGround.idx >= 0 && minGround.value <= 0) || (minAir.idx >= 0 && minAir.value <= 2);
+    return { minAir, minGround, airFrost: minAir.value <= 0, groundFrost };
+}
+
+function updateFrostUI(hourly, nowIdx) {
+    const frost = findFrost(hourly, nowIdx);
+    const valEl = document.getElementById('frostVal');
+    const status = document.getElementById('frostStatus');
+    const desc = document.getElementById('frostDesc');
+    status.className = 'status-pill';
+    
+    if (frost.minAir.idx < 0) {
+        valEl.textContent = '-- °C';
+        status.textContent = 'Keine Daten';
+        status.classList.add('warning');
+        desc.textContent = '';
+        return;
+    }
+    
+    valEl.textContent = `${frost.minAir.value.toFixed(1)} °C`;
+    const when = formatHourLabel(hourly.time[frost.minAir.idx]);
+    if (frost.airFrost) {
+        status.textContent = 'Frost';
+        status.classList.add('danger');
+        desc.textContent = `Luftfrost erwartet (Tiefstwert ${when}). Empfindliche Kulturen schützen.`;
+    } else if (frost.groundFrost) {
+        status.textContent = 'Bodenfrost möglich';
+        status.classList.add('warning');
+        desc.textContent = `Bodennah Frost möglich (Tiefstwert ${when}).`;
+    } else {
+        status.textContent = 'Frostfrei';
+        status.classList.add('success');
+        desc.textContent = `Tiefstwert der nächsten 48 Std. ${when}.`;
+    }
+}
+
+/**
+ * Helper: "Mo 06:00" style label for an hourly time string
+ */
+function formatHourLabel(timeStr) {
+    const timeObj = new Date(timeStr);
+    const weekday = timeObj.toLocaleDateString('de-AT', { weekday: 'short' });
+    const time = timeObj.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+    return `${weekday} ${time} Uhr`;
 }
 
 /**
