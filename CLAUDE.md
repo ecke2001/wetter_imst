@@ -26,7 +26,11 @@ Data flow in `app.js`:
 
 Locations: the `LOCATIONS` map at the top of `app.js` holds the 8 district municipalities (keys must match `<option value>` in `#locationSelect` in `index.html`). GPS adds a dynamic `gps` option labelled via `findNearestLocation`. `handleLocationChange` / `requestGPSLocation` update state and refetch.
 
-Tabs are switched by `switchTab(name)`; the Windy radar iframe is lazy-loaded (`initRadar`) to save resources.
+Tabs: `switchTab(name)` is a hard-coded if/else chain over element ids (`tabBtn<Name>` / `tabContent<Name>`, active class `active-content`). A new tab needs a branch there plus matching markup in `index.html`.
+
+Radar: the Windy iframe `src` is only set when the radar tab is active (or `force`), and only if the coordinates changed since the last load (`radarLoadedLat/Lon`). Location changes call `initRadar()` so a stale map isn't shown.
+
+Indices: the heu/spritz/gülle indices on the dashboard are computed for day 0 / the next 12 hours (`calculateAllIndices`); the forecast accordion and `simulateHayDrying(dayIndex, …)` reuse the same calculators for other days. Changing a threshold in one of them affects every view that calls it.
 
 ## Constraints
 
