@@ -44,3 +44,12 @@ npm ci
 npm run lint   # ESLint, html-validate, Stylelint
 npm test       # Playwright-Smoke-Tests mit simulierten Wetterdaten
 ```
+
+## Deployment (Hugging Face Spaces)
+Jeder Push auf `main` wird nach erfolgreichem Lint und Tests automatisch in den Hugging Face Space hochgeladen (`.github/workflows/ci.yml`, Job `deploy`). Hochgeladen werden nur die App-Dateien (`index.html`, `index.css`, `app.js`, `theme-init.js`, `icon.svg`) und diese README (Space-Einstellungen im Kopfbereich).
+
+Einmalige Einrichtung:
+1. Hugging Face → Settings → Access Tokens: Token mit Schreibrecht erstellen (am besten fine-grained, nur für diesen Space).
+2. GitHub → Repository → Settings → Secrets and variables → Actions → **New repository secret**: Name `HF_TOKEN`, Wert = Token.
+3. Optional: Repository-Variable `HF_SPACE` (z. B. `benutzer/agrarwetter-imst`). Ohne Angabe wird `<Token-Besitzer>/wetter_imst` verwendet und bei Bedarf angelegt.
+4. Actions → CI → **Run workflow** auf `main` (oder nächster Push).

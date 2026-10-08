@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # manual re-deploy (e.g. right after adding the HF_TOKEN secret)
 
 permissions:
   contents: read
@@ -22,3 +23,35 @@ jobs:
       - run: npm run lint
       - run: npx playwright install --with-deps chromium
       - run: npm test
+
+  # Publish to the Hugging Face Space, only from main and only if lint + tests passed
+  deploy:
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: deploy-hf
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect app files (no tests, configs or node_modules)
+        run: |
+          mkdir _site
+          cp index.html index.css app.js theme-init.js icon.svg _site/
+          # README.md carries the Space settings (front matter: sdk static)
+          cp README.md _site/
+          # Fail if index.html references a local file that is not in the list above
+          for f in $(grep -oE '(src|href)="[^":#]+"' index.html | sed -E 's/^[a-z]+="(.*)"$/\1/'); do
+            test -f "_site/$f" || { echo "::error::index.html references $f, which is not deployed"; exit 1; }
+          done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install huggingface_hub==2.1.1
+      - name: Upload to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+          GIT_SHA: ${{ github.sha }}
+        run: python .github/scripts/deploy_hf_space.py _site
