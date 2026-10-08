@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>AgrarWetter Imst | Wetter & Heuwetter-Index für Tirol</title>
     <meta name="description" content="Echtzeit-Wetterdaten, Heuwetter-Index, Bodentemperatur und Pflanzenschutz-Prognosen für Landwirte im Bezirk Imst, Tirol. Powered by Open-Meteo.">
     <!-- Google Fonts: Inter & Outfit -->
@@ -41,7 +41,7 @@
                 </div>
                 <div class="header-controls">
                     <div class="select-wrapper">
-                        <select id="locationSelect" onchange="handleLocationChange()">
+                        <select id="locationSelect" aria-label="Standort wählen">
                             <option value="imst" selected>Imst (828m)</option>
                             <option value="tarrenz">Tarrenz (836m)</option>
                             <option value="roppen">Roppen (724m)</option>
@@ -53,10 +53,16 @@
                         </select>
                         <i data-lucide="map-pin" class="select-icon"></i>
                     </div>
-                    <button class="gps-btn" id="gpsBtn" onclick="requestGPSLocation()" title="Aktuellen Standort über GPS ermitteln">
+                    <button type="button" class="gps-btn" id="gpsBtn" title="Aktuellen Standort über GPS ermitteln">
                         <i data-lucide="locate"></i> <span>GPS</span>
                     </button>
-                    <button class="gps-btn theme-btn" id="themeBtn" onclick="cycleTheme()" title="Farbschema wechseln" aria-label="Farbschema wechseln">
+                    <button type="button" class="gps-btn icon-btn" id="saveFieldBtn" title="Aktuellen Standort als Feld speichern" aria-label="Feld speichern">
+                        <i data-lucide="bookmark-plus"></i>
+                    </button>
+                    <button type="button" class="gps-btn icon-btn danger hide" id="deleteFieldBtn" title="Gespeichertes Feld löschen" aria-label="Feld löschen">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                    <button type="button" class="gps-btn icon-btn" id="themeBtn" title="Farbschema wechseln" aria-label="Farbschema wechseln">
                         <i data-lucide="sun-moon"></i>
                     </button>
                 </div>
@@ -64,17 +70,17 @@
             
             <!-- Tab Navigation -->
             <nav class="tab-navigation">
-                <button class="tab-btn active" id="tabBtnDashboard" onclick="switchTab('dashboard')">
-                    <i data-lucide="layout-dashboard"></i> Übersicht & Indizes
+                <button type="button" class="tab-btn active" id="tabBtnDashboard" data-tab="dashboard">
+                    <i data-lucide="layout-dashboard"></i> <span class="label-long">Übersicht & Indizes</span><span class="label-short">Übersicht</span>
                 </button>
-                <button class="tab-btn" id="tabBtnRadar" onclick="switchTab('radar')">
-                    <i data-lucide="radar"></i> Regenradar
+                <button type="button" class="tab-btn" id="tabBtnRadar" data-tab="radar">
+                    <i data-lucide="radar"></i> <span class="label-long">Regenradar</span><span class="label-short">Radar</span>
                 </button>
-                <button class="tab-btn" id="tabBtnAgro" onclick="switchTab('agro')">
-                    <i data-lucide="sprout"></i> Bodendaten & Gesundheit
+                <button type="button" class="tab-btn" id="tabBtnAgro" data-tab="agro">
+                    <i data-lucide="sprout"></i> <span class="label-long">Bodendaten & Gesundheit</span><span class="label-short">Boden</span>
                 </button>
-                <button class="tab-btn" id="tabBtnLinks" onclick="switchTab('links')">
-                    <i data-lucide="external-link"></i> Agrar-Infoportale
+                <button type="button" class="tab-btn" id="tabBtnLinks" data-tab="links">
+                    <i data-lucide="external-link"></i> <span class="label-long">Agrar-Infoportale</span><span class="label-short">Links</span>
                 </button>
             </nav>
         </header>
@@ -91,6 +97,33 @@
                     <div id="activeAlert" class="alert-pill hide">
                         <i data-lucide="alert-triangle"></i>
                         <span id="alertText">Keine Wetterwarnungen</span>
+                    </div>
+                </div>
+
+                <!-- HEUTE AM HOF: konkrete Arbeitsempfehlungen -->
+                <div class="card planner-card">
+                    <h2><i data-lucide="clipboard-list"></i> Heute am Hof</h2>
+                    <div class="planner-grid">
+                        <div class="plan-tile" id="planSpray">
+                            <div class="plan-title"><i data-lucide="droplets"></i> Spritzfenster</div>
+                            <div class="plan-main">--</div>
+                            <div class="plan-sub"></div>
+                        </div>
+                        <div class="plan-tile" id="planMow">
+                            <div class="plan-title"><i data-lucide="leaf"></i> Nächster Mähtag</div>
+                            <div class="plan-main">--</div>
+                            <div class="plan-sub"></div>
+                        </div>
+                        <div class="plan-tile" id="planGuelle">
+                            <div class="plan-title"><i data-lucide="sprout"></i> Gülle-Tag</div>
+                            <div class="plan-main">--</div>
+                            <div class="plan-sub"></div>
+                        </div>
+                        <div class="plan-tile" id="planWarn">
+                            <div class="plan-title"><i data-lucide="alert-triangle"></i> Warnungen</div>
+                            <div class="plan-main">--</div>
+                            <div class="plan-sub"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -209,7 +242,7 @@
                 <!-- 7-TAGE VORHERSAGE MIT DETAILS -->
                 <div class="card forecast-card">
                     <div class="forecast-header">
-                        <h2>7-Tage-Vorhersage & Heuwetter-Ampel</h2>
+                        <h2>14-Tage-Vorhersage & Heuwetter-Ampel</h2>
                         <span class="hint"><i data-lucide="info"></i> Klicken Sie auf einen Tag für stündliche Details & Trocknungsparameter.</span>
                     </div>
                     
@@ -220,6 +253,9 @@
                             <span>Vorhersagedaten werden geladen...</span>
                         </div>
                     </div>
+                    <button type="button" class="forecast-more-btn hide" id="forecastMoreBtn">
+                        <i data-lucide="calendar-plus"></i> <span id="forecastMoreText">Weitere 7 Tage anzeigen</span>
+                    </button>
                 </div>
 
                 <!-- DIAGRAMME -->
@@ -311,6 +347,30 @@
                                 <div class="index-footer">
                                     <span class="status-pill" id="soilMoistStatus">Lade...</span>
                                     <span class="index-desc" id="soilMoistDesc">Verfügbares Bodenwasser.</span>
+                                </div>
+                            </div>
+
+                            <!-- Niederschlag letzte 7 Tage -->
+                            <div class="agro-metric-row">
+                                <div class="metric-meta">
+                                    <span class="metric-label"><i data-lucide="cloud-rain"></i> Regen letzte 7 Tage</span>
+                                    <span class="metric-value" id="pastRainVal">-- mm</span>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="pastRainStatus">Lade...</span>
+                                    <span class="index-desc" id="pastRainDesc">Wasserversorgung & Befahrbarkeit.</span>
+                                </div>
+                            </div>
+
+                            <!-- Frost 48h -->
+                            <div class="agro-metric-row">
+                                <div class="metric-meta">
+                                    <span class="metric-label"><i data-lucide="snowflake"></i> Tiefsttemperatur 48 Std.</span>
+                                    <span class="metric-value" id="frostVal">-- °C</span>
+                                </div>
+                                <div class="index-footer">
+                                    <span class="status-pill" id="frostStatus">Lade...</span>
+                                    <span class="index-desc" id="frostDesc">Luft- und Bodenfrost.</span>
                                 </div>
                             </div>
                         </div>
@@ -454,6 +514,23 @@
             </section>
 
         </main>
+
+        <!-- FELD SPEICHERN DIALOG -->
+        <dialog id="fieldDialog" class="field-dialog" aria-labelledby="fieldDialogTitle">
+            <form id="fieldForm">
+                <h2 id="fieldDialogTitle"><i data-lucide="bookmark-plus"></i> Feld speichern</h2>
+                <p class="field-coords">Standort: <span id="fieldCoords">--</span></p>
+                <label for="fieldName">Name</label>
+                <input type="text" id="fieldName" maxlength="40" required placeholder="z. B. Bergwiese Hoch-Imst" autocomplete="off">
+                <label for="fieldElevation">Höhe (m, optional)</label>
+                <input type="number" id="fieldElevation" min="0" max="4000" step="1" inputmode="numeric" placeholder="z. B. 1050">
+                <p class="field-hint">Die genaue Höhe verbessert Temperatur- und Frostprognose im Gebirge. Tipp: Zuerst per GPS orten, dann speichern.</p>
+                <div class="field-actions">
+                    <button type="button" class="btn-secondary" id="fieldCancelBtn">Abbrechen</button>
+                    <button type="submit" class="btn-primary">Speichern</button>
+                </div>
+            </form>
+        </dialog>
 
         <!-- FOOTER -->
         <footer class="app-footer">
