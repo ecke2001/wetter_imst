@@ -18,6 +18,13 @@ npx playwright test -g "offline"      # single test by name
 
 CI (`.github/workflows/ci.yml`) runs lint + tests on every PR; on `main` the `deploy` job then uploads the app to the Hugging Face Space via `.github/scripts/deploy_hf_space.py` (token from the `HF_TOKEN` secret, Space id from the optional `HF_SPACE` variable). It deploys an explicit file list (`index.html index.css app.js theme-init.js icon.svg` + `README.md` for the Space front matter): a new app file must be added to that `cp` line, otherwise the job fails because `index.html` references a file that isn't deployed. Never put the token anywhere in the repo. The tests need no network: `tests/helpers.js` mocks Open-Meteo with `tests/mock-weather.js` (synthetic data relative to "now"), Windy and Google Fonts, and serves the CDN libraries from `node_modules`. Because those are the exact npm versions pinned in `package.json`, a wrong SRI hash in `index.html` fails the tests. Keep the `lucide`/`chart.js` devDependency versions in sync with the CDN URLs.
 
+## Workflow, deployment and docs
+
+- Live: https://huggingface.co/spaces/ecke1985/wetter_imst (direct: https://ecke1985-wetter-imst.static.hf.space). Repo: `ecke2001/wetter_imst`.
+- Changes go branch → PR → CI green → **rebase merge** (`main` has linear history, no merge commits). A merge to `main` deploys automatically; there is no separate release step.
+- Add a short entry to `CHANGELOG.md` in the same PR. User-facing docs are German: `README.md` (also shown on the HF Space, so it uses absolute GitHub links), `docs/ENTWICKLUNG.md` (developer guide: farming-logic reference, recipes, troubleshooting), `plan.md` (open ideas / done). Keep them in sync when behavior, thresholds or the workflow change.
+- Claude Code cloud sessions: the sandbox network blocks Open-Meteo, jsDelivr and huggingface.co, so live checks aren't possible there; rely on `npm test` (fully mocked). Deploy problems are diagnosed from the GitHub Actions logs (`deploy` job).
+
 ## Architecture
 
 The app is `index.html` (markup), `index.css`, `app.js` (global-scope functions, no modules) and the tiny `theme-init.js`. All event handlers are bound in `bindEvents()` via `addEventListener` (no inline `onclick`; forecast rows use delegation on `#forecastList`). External libraries (Lucide icons, Chart.js) are CDN-pinned `defer` scripts with SRI hashes; call `refreshIcons()` after any DOM update that injects `<i data-lucide>` elements.
