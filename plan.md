@@ -1,33 +1,59 @@
-# Entwicklungsplan: Zukünftige Erweiterungen (AgrarWetter Imst)
+# Entwicklungsplan (AgrarWetter Imst)
 
-Hier sind potenzielle Erweiterungen und Verbesserungen für die AgrarWetter-App aufgelistet. Diese Schritte können in zukünftigen Sprints implementiert werden, um die App noch wertvoller für die landwirtschaftliche Praxis im Bezirk Imst zu machen.
+Stand: 2026-10-08. Offene Ideen oben, bereits Umgesetztes unten. Details zur Umsetzung neuer Funktionen:
+[docs/ENTWICKLUNG.md](docs/ENTWICKLUNG.md) (Abschnitt „Häufige Aufgaben“).
 
 ---
 
-## 1. Lokalisierung & Stationsauswahl
-*   **Gemeindeauswahl:** Statt der festen Koordinaten für Imst-Stadt soll ein Dropdown-Menü oder eine Suchleiste integriert werden, um das Wetter für alle Gemeinden im Bezirk Imst (z. B. Tarrenz, Karres, Roppen, Nassereith, Silz, Längenfeld, Sölden) abzufragen.
-*   **GPS-Ortung:** Ein Button zur automatischen Ermittlung der aktuellen GPS-Koordinaten auf dem Feld.
-*   **Bodenhöhen-Korrektur:** Anpassung der Vorhersage an die genaue Höhe der Alm- oder Talwiese, da im alpinen Gelände oft wenige hundert Höhenmeter über Frost oder Taupunkt entscheiden.
+## Offen / Ideen
 
-## 2. Erweiterte Boden- & Aussaatparameter
-*   **Bodenfeuchte in verschiedenen Tiefen:** Visualisierung der Bodenfeuchte (0-7 cm für Keimung, 7-28 cm für Wurzeln) aus den Open-Meteo-Agrardaten.
-*   **Bodentemperatur-Trend:** Anzeige der Bodentemperatur, um den idealen Zeitpunkt für die Aussaat von Mais, Kartoffeln oder Getreide zu ermitteln (z. B. Keimtemperatur-Schwellenwerte).
-*   **Bodenfrost-Warnung:** Warnung vor Spätfrost im Frühjahr auf Bodenhöhe (wichtig für Obstbauern im Inntal).
+### Hohe Priorität
+*   **Offizielle Unwetterwarnungen (GeoSphere Austria):** Warnungen für den Standort direkt in der App anzeigen
+    (z. B. in der Kachel „Warnungen“ von „Heute am Hof“). Benötigt die Warn-Schnittstelle von GeoSphere;
+    deren Adresse muss in die Content-Security-Policy (`connect-src`) und in die Test-Simulation (`tests/helpers.js`).
+    Konnte bisher nicht umgesetzt werden, weil die Schnittstelle aus der Entwicklungsumgebung nicht erreichbar war.
+*   **Live-Prüfung mit echten Daten automatisieren:** z. B. ein wöchentlicher Workflow, der die Live-Seite lädt und
+    prüft, dass Icons, Diagramme und Wetterdaten erscheinen (erkennt CDN-/SRI- und API-Änderungen früh).
 
-## 3. Krankheits- & Schädlingsprognosen
-*   **Pflanzenschutz-Prognosemodelle:** Berechnung von Infektionsrisiken basierend auf Blattnässestunden und Temperatur:
-    *   *Kraut- und Knollenfäule* bei Kartoffeln.
-    *   *Apfelschorf* oder *Echter Mehltau* im Obstbau.
-*   **Bienenflug-Index:** Ein Index, der bewertet, ob Wind, Temperatur und Niederschlag den Bienenflug und somit die Bestäubung begünstigen (wichtig für Obstplantagen).
+### Mittlere Priorität
+*   **Live-Messwerte der Tiroler Landesstationen (Hydro Online):** Pegelstände, Bodensensoren und Stationsdaten
+    der nächstgelegenen Station direkt anzeigen statt nur zu verlinken.
+*   **Bodenfeuchte in mehreren Tiefen:** 0–7 cm (Keimung) und 7–28 cm (Wurzelraum) aus den Open-Meteo-Agrardaten.
+*   **Bodentemperatur-Trend:** Verlauf der nächsten Tage mit Keimtemperatur-Schwellen für Mais, Kartoffeln, Getreide.
+*   **Echter Mehltau (Obstbau):** zusätzliches Infektionsmodell analog zu Apfelschorf.
+*   **Wettermodell-Vergleich:** Unsicherheit anzeigen, z. B. ICON-D2 vs. ECMWF über den `models`-Parameter von Open-Meteo.
 
-## 4. Offline-Modus & App-Installation (PWA)
-*   **Progressive Web App (PWA) Conversion:** Umwandlung der Anwendung in eine PWA:
-    *   Hinzufügen eines `manifest.json` und eines Service-Workers.
-    *   Ermöglicht die Installation der App auf dem Handy-Startbildschirm ohne App Store.
-    *   **Offline-Caching:** Die zuletzt geladenen Wetterdaten bleiben auf dem Feld auch ohne Mobilfunknetz abrufbar.
+### Niedrige Priorität / Überlegungen
+*   **Heutrocknung verfeinern:** Ziel „unter 18 % Restfeuchte“ mit Wind und relativer Luftfeuchte als Trocknungskurve
+    (bisher nur Summe der ET₀ bis 10 mm).
+*   **Weidegang / Viehtrieb:** Hitze- und Kältestress-Index für Weidetiere (Temperatur, Feuchte, Wind).
+*   **PWA / App-Installation:** Bewusst zurückgestellt. Die App entfernt aktiv Service Worker, weil frühere Versionen
+    Ladeprobleme verursachten. Offline-Anzeige läuft über `localStorage`. Nur angehen, wenn Installation auf dem
+    Startbildschirm ausdrücklich gewünscht ist.
 
-## 5. Live-Messwerte der Tiroler Landesstationen
-*   **Schnittstelle zu Hydro Online:** Direkte Einbindung der Live-Daten der nächstgelegenen hydrografischen Stationen des Landes Tirol (z. B. Pegelstände, Bodensensoren) direkt in der App, statt nur extern zu verlinken.
+---
 
-## 6. Heutrocknungs-Simulation (Heu-Trocknungsuhr)
-*   **Trocknungsverlauf-Schätzung:** Ein interaktives Tool, das abschätzt, wie viele Stunden gemähtes Gras bei der aktuellen Wetterlage benötigt, um die kritische Grenze von unter 18% Restfeuchte zu erreichen. Dies kombiniert die stündliche Evapotranspiration, Wind und relative Luftfeuchtigkeit zu einer prognostizierten Trocknungskurve.
+## Erledigt
+
+### Lokalisierung & Standorte
+*   ✅ Gemeindeauswahl (8 Gemeinden im Bezirk Imst) – Juni 2026
+*   ✅ GPS-Ortung (auf ca. 100 m gerundet) – Juni 2026, Oktober 2026 verbessert
+*   ✅ Höhen-Korrektur über „Meine Felder“ (gespeicherte Standorte mit Höhe, an Open-Meteo übergeben) – Oktober 2026
+
+### Boden & Aussaat
+*   ✅ Bodentemperatur (6 cm) mit Keimungs-Hinweisen, Bodenfeuchte (3–9 cm) – Juni 2026
+*   ✅ Regen der letzten 7 Tage – Oktober 2026
+*   ✅ Luft- und Bodenfrost-Warnung für 48 Stunden – Oktober 2026
+
+### Krankheiten, Schädlinge, Nützlinge
+*   ✅ Kraut- und Knollenfäule, Apfelschorf, Bienenflug-Index – Juni 2026 (Apfelschorf-Berechnung im Oktober 2026 korrigiert)
+
+### Arbeitsplanung
+*   ✅ Heuwetter-, Spritzwetter-, Gülle-Index und Heu-Trocknungsuhr – Juni 2026
+*   ✅ „Heute am Hof“: Spritzfenster mit Uhrzeit, nächster Mähtag, nächster Gülle-Tag, Warnungen – Oktober 2026
+*   ✅ 14-Tage-Vorhersage mit Begründung der Heuwetter-Ampel – Oktober 2026
+
+### Bedienung & Technik
+*   ✅ Offline-Anzeige der letzten Daten (ohne Service Worker) – Oktober 2026
+*   ✅ Farbschema Hell/Dunkel/Hoher Kontrast, Handy-Layout mit Tab-Leiste unten – Oktober 2026
+*   ✅ Sicherheit (CSP, SRI), Lint, automatische Tests, automatisches Deployment – Oktober 2026

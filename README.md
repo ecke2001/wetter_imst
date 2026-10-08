@@ -11,6 +11,14 @@ pinned: false
 
 Eine hochperformante, mobile-optimierte Wetter-App für Landwirte im Raum Imst (Tirol), Österreich. Die App lädt Echtzeit-Wetterprognosen von Open-Meteo und berechnet spezifische landwirtschaftliche Kriterien.
 
+**Live:** [Hugging Face Space](https://huggingface.co/spaces/ecke1985/wetter_imst) · [direkte App-Adresse](https://ecke1985-wetter-imst.static.hf.space) · **Code:** [GitHub](https://github.com/ecke2001/wetter_imst)
+
+## Dokumentation
+- [Entwicklerhandbuch](https://github.com/ecke2001/wetter_imst/blob/main/docs/ENTWICKLUNG.md) – Aufbau, Arbeitsablauf, Agrar-Logik, Rezepte für häufige Änderungen, Tests, Deployment, Fehlerbehebung
+- [Entwicklungsplan](https://github.com/ecke2001/wetter_imst/blob/main/plan.md) – offene Ideen und bereits Umgesetztes
+- [Änderungsprotokoll](https://github.com/ecke2001/wetter_imst/blob/main/CHANGELOG.md) – was wann geändert wurde
+- [CLAUDE.md](https://github.com/ecke2001/wetter_imst/blob/main/CLAUDE.md) – Hinweise für den KI-Assistenten Claude Code
+
 ## Features
 - **Heute am Hof:** Konkrete Empfehlungen – Spritzfenster mit Uhrzeit, nächster Mähtag, nächster Gülle-Tag sowie Warnungen vor Frost, Sturm, Starkregen und Gewitter.
 - **Agrar-Indizes:** Tägliche und stündliche Indizes für Heuwetter, Spritzwetter und Gülle-Wetter.
@@ -48,8 +56,4 @@ npm test       # Playwright-Smoke-Tests mit simulierten Wetterdaten
 ## Deployment (Hugging Face Spaces)
 Jeder Push auf `main` wird nach erfolgreichem Lint und Tests automatisch in den Hugging Face Space hochgeladen (`.github/workflows/ci.yml`, Job `deploy`). Hochgeladen werden nur die App-Dateien (`index.html`, `index.css`, `app.js`, `theme-init.js`, `icon.svg`) und diese README (Space-Einstellungen im Kopfbereich).
 
-Einmalige Einrichtung:
-1. Hugging Face → Settings → Access Tokens: Token mit Schreibrecht erstellen (am besten fine-grained, nur für diesen Space).
-2. GitHub → Repository → Settings → Secrets and variables → Actions → **New repository secret**: Name `HF_TOKEN`, Wert = Token.
-3. Optional: Repository-Variable `HF_SPACE` (z. B. `benutzer/agrarwetter-imst`). Ohne Angabe wird `<Token-Besitzer>/wetter_imst` verwendet und bei Bedarf angelegt.
-4. Actions → CI → **Run workflow** auf `main` (oder nächster Push).
+Benötigt wird das GitHub-Secret `HF_TOKEN` (Hugging Face Token mit Schreibrecht, beginnt mit `hf_`). Einrichtung, Token-Erneuerung und Fehlerbehebung: siehe [Entwicklerhandbuch – Deployment](https://github.com/ecke2001/wetter_imst/blob/main/docs/ENTWICKLUNG.md#deployment-und-secrets).
